@@ -56,6 +56,16 @@ elif [ -f "./pwdmanager-server.tar.gz" ]; then
     LOCAL_TAR="./pwdmanager-server.tar.gz"
 elif [ -f "./dist/pwdmanager-server.tar.gz" ]; then
     LOCAL_TAR="./dist/pwdmanager-server.tar.gz"
+elif [ -f "$HOME/pwdmanager-server.tar.gz" ]; then
+    LOCAL_TAR="$HOME/pwdmanager-server.tar.gz"
+fi
+
+# 准备 GitHub 鉴权头 (支持私有仓库拉取)
+AUTH_ARGS=()
+if [ -n "$GITHUB_TOKEN" ]; then
+    AUTH_ARGS=(-H "Authorization: token $GITHUB_TOKEN")
+elif [ -n "$GH_TOKEN" ]; then
+    AUTH_ARGS=(-H "Authorization: token $GH_TOKEN")
 fi
 
 if [ -n "$LOCAL_TAR" ]; then
@@ -64,15 +74,27 @@ if [ -n "$LOCAL_TAR" ]; then
 else
     echo "🌐 正在从 GitHub Release 下载服务端最新安装包..."
     echo "   URL: $RELEASE_URL"
-    if curl -fL --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server.tar.gz" "$RELEASE_URL" 2>/dev/null; then
+    if curl -fL "${AUTH_ARGS[@]}" --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server.tar.gz" "$RELEASE_URL" 2>/dev/null; then
         echo "   ✅ GitHub Release 安装包下载成功！"
         tar -xzf "$TEMP_DIR/pwdmanager-server.tar.gz" -C "$TEMP_DIR"
     else
         echo "   ⚠️ 未在 Release 找到发布包，尝试从 GitHub 源码分支直接拉取安装..."
         mkdir -p "$TEMP_DIR/pwdmanager-server/download"
-        curl -fsSL -o "$TEMP_DIR/pwdmanager-server/app.py" "${RAW_BASE_URL}/server/app.py"
-        curl -fsSL -o "$TEMP_DIR/pwdmanager-server/install.sh" "${RAW_BASE_URL}/server/install.sh"
-        curl -fL --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server/download/PwdManager.apk" "https://github.com/${GITHUB_REPO}/releases/latest/download/PwdManager.apk" 2>/dev/null || true
+        if curl -fsSL "${AUTH_ARGS[@]}" -o "$TEMP_DIR/pwdmanager-server/app.py" "${RAW_BASE_URL}/server/app.py" 2>/dev/null && \
+           curl -fsSL "${AUTH_ARGS[@]}" -o "$TEMP_DIR/pwdmanager-server/install.sh" "${RAW_BASE_URL}/server/install.sh" 2>/dev/null; then
+            echo "   ✅ 成功从 GitHub 源码分支拉取核心文件！"
+            curl -fL "${AUTH_ARGS[@]}" --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server/download/PwdManager.apk" "https://github.com/${GITHUB_REPO}/releases/latest/download/PwdManager.apk" 2>/dev/null || true
+        else
+            echo ""
+            echo "❌ 错误: 无法从 GitHub 下载安装包或源码文件！"
+            echo "💡 排查建议:"
+            echo "  1. 若仓库为 GitHub 私有仓库 (Private Repo)，请提供 GITHUB_TOKEN:"
+            echo "     curl -fsSL -H \"Authorization: token \$GITHUB_TOKEN\" https://raw.githubusercontent.com/${GITHUB_REPO}/main/install_server.sh | sudo GITHUB_TOKEN=\$GITHUB_TOKEN bash"
+            echo "  2. 或者直接从本地编译机复制安装包进行安装:"
+            echo "     scp dist/pwdmanager-server.tar.gz dist/install_server.sh user@server_ip:~/"
+            echo "     ssh user@server_ip 'sudo bash install_server.sh'"
+            exit 1
+        fi
     fi
 fi
 
