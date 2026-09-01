@@ -21,10 +21,16 @@ public class CryptoUtils {
     private static final int KEY_LENGTH = 256;
 
     private static SecretKey deriveKey(String masterPassword, byte[] salt) throws Exception {
-        KeySpec spec = new PBEKeySpec(masterPassword.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH);
+        char[] passChars = masterPassword.toCharArray();
+        PBEKeySpec spec = new PBEKeySpec(passChars, salt, ITERATION_COUNT, KEY_LENGTH);
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         byte[] keyBytes = factory.generateSecret(spec).getEncoded();
-        return new SecretKeySpec(keyBytes, "AES");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
+        // Clear sensitive memory buffers immediately
+        spec.clearPassword();
+        java.util.Arrays.fill(passChars, '\0');
+        java.util.Arrays.fill(keyBytes, (byte) 0);
+        return secretKeySpec;
     }
 
     public static class EncryptionResult {

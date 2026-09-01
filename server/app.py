@@ -53,6 +53,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("PWD_DB_PATH", os.path.join(BASE_DIR, "passwords.db"))
 DOWNLOAD_DIR = os.environ.get("PWD_DOWNLOAD_DIR", os.path.join(BASE_DIR, "download"))
 DEFAULT_PRIVATE_KEY = os.environ.get("MASTER_PRIVATE_KEY", "PwdManager#MasterSecretKey2026AES256")
+MAX_REQUEST_BODY_SIZE = 10 * 1024 * 1024  # 10 MB strict limit
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1" 
 
 # ==============================================================================
 # 🛡️ Dual-Dimension Anti-Brute-Force Engine (IP + Account Level Protection)
@@ -1515,17 +1517,28 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 class RequestHandler(BaseHTTPRequestHandler):
     def _send_security_headers(self):
-        origin = self.headers.get('Origin', '')
-        host = self.headers.get('Host', '')
+        origin = self.headers.get('Origin', '').strip()
+        host = self.headers.get('Host', '').split(':')[0].strip()
 
-        # Secure CORS origin reflection for trusted intranet / localhost / same-host origins
-        if origin and (origin.endswith(host) or "127.0.0.1" in origin or "localhost" in origin or "192.168." in origin or "10." in origin or "172." in origin):
-            self.send_header('Access-Control-Allow-Origin', origin)
-        else:
-            self.send_header('Access-Control-Allow-Origin', '*')
+        # Strict Origin Validation (Prevents Domain Suffix Spoofing and Unauthorized Cross-Origin Reading)
+        if origin:
+            try:
+                parsed_origin = urlparse(origin)
+                origin_host = parsed_origin.hostname or ""
+                # Allow same host, localhost, loopback, or RFC 1918 private subnets
+                if (origin_host == host or
+                    origin_host in ["localhost", "127.0.0.1", "::1"] or
+                    origin_host.startswith("192.168.") or
+                    origin_host.startswith("10.") or
+                    (origin_host.startswith("172.") and len(origin_host.split('.')) == 4 and 16 <= int(origin_host.split('.')[1]) <= 31)):
+                    self.send_header('Access-Control-Allow-Origin', origin)
+                    self.send_header('Vary', 'Origin')
+            except Exception:
+                pass
 
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token, X-Requested-With')
+        self.send_header('Access-Control-Max-Age', '86400')
         # Standard OWASP Web Security Headers
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
@@ -1580,17 +1593,32 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
 
     def _read_json_body(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        if content_length == 0:
+        raw_cl = self.headers.get('Content-Length', '').strip()
+        if not raw_cl:
             return {}
+        try:
+            content_length = int(raw_cl)
+        except ValueError:
+            raise ValueError("Invalid Content-Length header")
+
+        if content_length < 0:
+            raise ValueError("Negative Content-Length not permitted")
+        if content_length > MAX_REQUEST_BODY_SIZE:
+            raise ValueError(f"Payload exceeds maximum allowed limit ({MAX_REQUEST_BODY_SIZE} bytes)")
+
         body = self.rfile.read(content_length)
+        if len(body) != content_length:
+            raise ValueError("Request body truncated or incomplete")
         return json.loads(body.decode('utf-8'))
 
     def _get_client_ip(self):
-        forwarded = self.headers.get('X-Forwarded-For')
-        if forwarded:
-            return forwarded.split(',')[0].strip()
-        return self.client_address[0]
+        peer_ip = self.client_address[0]
+        # Only trust X-Forwarded-For if peer is local reverse proxy and TRUST_PROXY is enabled
+        if TRUST_PROXY and peer_ip in ["127.0.0.1", "::1"]:
+            forwarded = self.headers.get('X-Forwarded-For')
+            if forwarded:
+                return forwarded.split(',')[0].strip()
+        return peer_ip
 
     def _get_auth_user(self):
         # Strict Header-only Token Authentication (Forbidden in query parameters)
