@@ -232,10 +232,13 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                                     JSONObject obj = new JSONObject(res.body);
                                     PasswordItem saved = PasswordItem.fromJson(obj);
                                     saved.setPassword(password);
+                                    long newGv = obj.optLong("global_version", dbHelper.getGlobalVersion() + 1);
+                                    dbHelper.setGlobalVersion(newGv);
                                     dbHelper.upsertPassword(saved);
                                     loadLocalData();
+                                    updateTitleWithVersion();
                                     dialog.dismiss();
-                                    Toast.makeText(MainActivity.this, "已保存并在服务端完成加密", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(MainActivity.this, "已保存 (全局版本已自增至 v" + newGv + ")", Toast.LENGTH_SHORT).show();
                                     performSync();
                                 } catch (Exception e) {
                                     newItem.setPassword(password);

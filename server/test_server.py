@@ -282,35 +282,37 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     gv_after_update1 = occ_update1.get("global_version")
     assert gv_after_update1 == gv_after_create + 1, f"Expected global version {gv_after_create + 1}, got {gv_after_update1}"
 
-    # (d) Multi-version gap sync: Client sends higher version (v1000, gap = +900) -> Server updates all client records & adopts v1000
+    # (d) Multi-version gap sync: Client sends higher version (gap = +1000) -> Server updates all client records & adopts higher version
+    high_client_ver = gv_after_update1 + 1000
     sync_high_payload = {
-        "client_version": 1000,
+        "client_version": high_client_ver,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#Gap1000", "version": 1000}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#GapHigh", "version": high_client_ver}
         ]
     }
     status, _, sync_res1 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_high_payload, headers=auth_headers)
     assert status == 200
-    assert sync_res1.get("server_version") == 1000, f"Expected server version 1000 after sync, got {sync_res1.get('server_version')}"
+    assert sync_res1.get("server_version") == high_client_ver, f"Expected server version {high_client_ver} after sync, got {sync_res1.get('server_version')}"
 
     # Verify server adopted the client's higher data
     status, _, occ_get1 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
-    assert occ_get1.get("plain_password") == "OCCPassword#Gap1000"
+    assert occ_get1.get("plain_password") == "OCCPassword#GapHigh"
 
-    # (e) Multi-version gap sync: Client sends lower version (v50, gap = -950 vs server v1000) -> Server retains v1000 & protects data
+    # (e) Multi-version gap sync: Client sends lower version (gap = -500 vs server) -> Server retains higher version & protects data
+    low_client_ver = max(0, high_client_ver - 500)
     sync_low_payload = {
-        "client_version": 50,
+        "client_version": low_client_ver,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#Stale50", "version": 50}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#StaleLow", "version": low_client_ver}
         ]
     }
     status, _, sync_res2 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_low_payload, headers=auth_headers)
     assert status == 200
-    assert sync_res2.get("server_version") == 1000
+    assert sync_res2.get("server_version") == high_client_ver
     status, _, occ_get2 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
-    assert occ_get2.get("plain_password") == "OCCPassword#Gap1000", "Server data must be protected against lower client version"
+    assert occ_get2.get("plain_password") == "OCCPassword#GapHigh", "Server data must be protected against lower client version"
     print("  [PASS] 14. 64-bit Global Versioning, Atomic OCC & Multi-version Gap Sync fully validated!")
 
     print("\n==========================================================================================")

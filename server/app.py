@@ -1776,6 +1776,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
             """, (new_key, now_rot))
             cursor.execute("INSERT OR IGNORE INTO key_history (key, created_at) VALUES (?, ?)", (new_key, now_rot))
+            new_gv = get_global_version(conn)
+            if reencrypted_count > 0:
+                success, new_gv = increment_global_version(conn)
             conn.commit()
             conn.close()
 
@@ -1783,6 +1786,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "success": True,
                 "message": "Key rotated successfully",
                 "reencrypted_records_count": reencrypted_count,
+                "global_version": new_gv,
                 "current_private_key": new_key
             })
             return
@@ -1837,12 +1841,16 @@ class RequestHandler(BaseHTTPRequestHandler):
                 """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, r_version))
                 imported_count += 1
 
+            new_gv = get_global_version(conn)
+            if imported_count > 0:
+                success, new_gv = increment_global_version(conn)
             conn.commit()
             conn.close()
 
             self._send_json(200, {
                 "success": True,
                 "imported_records_count": imported_count,
+                "global_version": new_gv,
                 "current_private_key": get_current_private_key()
             })
             return
