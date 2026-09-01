@@ -53,9 +53,27 @@ if [[ ! "$TAG_NAME" =~ ^v ]]; then
     TAG_NAME="v$TAG_NAME"
 fi
 
-export PATH="/home/jason/.local/bin:$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
-export JAVA_HOME="${JAVA_HOME:-$HOME/.local/share/java/jdk-17}"
+# Auto-detect JAVA_HOME if not valid
+if [ -z "$JAVA_HOME" ] || [ ! -d "$JAVA_HOME" ]; then
+    for candidate in "/usr/lib/jvm/java-21-openjdk-amd64" "/usr/lib/jvm/java-17-openjdk-amd64" "$HOME/.local/share/java/jdk-17" "$HOME/.local/share/java/jdk-21"; do
+        if [ -d "$candidate" ]; then
+            export JAVA_HOME="$candidate"
+            break
+        fi
+    done
+fi
+
+# Auto-detect ANDROID_HOME if not valid
+if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME" ]; then
+    for candidate in "$HOME/Android/sdk" "$HOME/Android/Sdk" "$HOME/android-sdk" "/opt/android-sdk"; do
+        if [ -d "$candidate" ]; then
+            export ANDROID_HOME="$candidate"
+            break
+        fi
+    done
+fi
+
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/home/jason/.local/bin:$PATH"
 
 echo "=================================================="
 echo " 🔨 密码管理器一键编译打包系统"
