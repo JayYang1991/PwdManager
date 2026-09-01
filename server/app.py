@@ -473,8 +473,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="theme-color" content="#030712">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>星空密码管理器 - Web安全控制台</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -486,7 +489,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             --primary-glow: rgba(129, 140, 248, 0.4);
             --accent-cyan: #38BDF8;
             --accent-pink: #F43F5E;
-            --card-glass: rgba(15, 23, 42, 0.7);
+            --card-glass: rgba(15, 23, 42, 0.72);
             --card-border: rgba(255, 255, 255, 0.12);
             --card-hover-border: rgba(129, 140, 248, 0.5);
             --text-main: #F8FAFC;
@@ -494,15 +497,24 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             --text-glow: 0 0 10px rgba(255, 255, 255, 0.2);
             --radius: 16px;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             background-color: var(--cosmic-bg);
             color: var(--text-main);
             min-height: 100vh;
+            min-height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
             overflow-x: hidden;
             position: relative;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
         
         /* Starfield Canvas Background */
@@ -536,11 +548,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         /* Glass Navbar */
         .navbar {
-            background: rgba(10, 15, 30, 0.75);
+            background: rgba(10, 15, 30, 0.8);
             border-bottom: 1px solid var(--card-border);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            padding: 14px 32px;
+            padding: 12px 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -548,18 +560,25 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             top: 0;
             z-index: 50;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s;
         }
-        .logo-group { display: flex; align-items: center; gap: 14px; }
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
         .logo-icon {
-            width: 44px;
-            height: 44px;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
             border-radius: 12px;
             background: linear-gradient(135deg, #6366F1, #A855F7, #EC4899);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 22px;
+            font-size: 20px;
             box-shadow: 0 0 20px rgba(168, 85, 247, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.3);
             animation: pulseGlow 4s infinite alternate;
@@ -568,31 +587,56 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             0% { box-shadow: 0 0 15px rgba(129, 140, 248, 0.4); }
             100% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.6); }
         }
-        .brand-title { font-size: 20px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.5px; }
+        .brand-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #FFFFFF;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
         .badge-secure {
             background: rgba(129, 140, 248, 0.15);
             border: 1px solid rgba(129, 140, 248, 0.4);
             color: var(--accent-cyan);
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 10px;
+            padding: 3px 8px;
             border-radius: 20px;
             box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+            white-space: nowrap;
         }
         
-        .user-nav { display: flex; align-items: center; gap: 12px; }
+        .user-nav-desktop {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .user-nav-mobile {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
         .btn {
-            padding: 9px 18px;
+            padding: 8px 16px;
+            min-height: 38px;
             border-radius: 10px;
             border: none;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            gap: 6px;
             text-decoration: none;
+            white-space: nowrap;
+            user-select: none;
         }
         .btn-primary {
             background: linear-gradient(135deg, #6366F1, #8B5CF6, #D946EF);
@@ -600,7 +644,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .btn-primary:hover {
+        .btn-primary:hover, .btn-primary:active {
             transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba(217, 70, 239, 0.6);
             background: linear-gradient(135deg, #4F46E5, #7C3AED, #C026D3);
@@ -611,7 +655,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             color: var(--text-main);
             backdrop-filter: blur(8px);
         }
-        .btn-outline:hover {
+        .btn-outline:hover, .btn-outline:active {
             background: rgba(30, 41, 59, 0.8);
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
@@ -625,7 +669,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             font-weight: 600;
             box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
         }
-        .btn-app:hover {
+        .btn-app:hover, .btn-app:active {
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(6, 182, 212, 0.4));
             border-color: #34D399;
             box-shadow: 0 0 20px rgba(52, 211, 153, 0.4);
@@ -634,8 +678,8 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         .container {
             max-width: 1240px;
-            margin: 28px auto;
-            padding: 0 24px;
+            margin: 24px auto;
+            padding: 0 20px;
             width: 100%;
             flex: 1;
             position: relative;
@@ -646,14 +690,14 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 28px;
+            gap: 16px;
+            margin-bottom: 24px;
         }
         .stat-card {
             background: var(--card-glass);
             border: 1px solid var(--card-border);
             border-radius: var(--radius);
-            padding: 20px 24px;
+            padding: 18px 20px;
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -676,26 +720,50 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             box-shadow: 0 10px 30px rgba(129, 140, 248, 0.25);
             transform: translateY(-2px);
         }
-        .stat-label { font-size: 13px; color: var(--text-sub); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-        .stat-value { font-size: 26px; font-weight: 700; color: #FFFFFF; text-shadow: 0 0 12px rgba(255, 255, 255, 0.2); }
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #FFFFFF;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+            word-break: break-all;
+        }
         
         /* Action Bar */
         .action-bar {
             background: var(--card-glass);
             border: 1px solid var(--card-border);
             border-radius: var(--radius);
-            padding: 18px 24px;
-            margin-bottom: 28px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 12px;
             backdrop-filter: blur(16px);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
-        .search-box { position: relative; width: 340px; }
-        .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--accent-cyan); }
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+            max-width: 460px;
+        }
+        .search-box i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-cyan);
+        }
         .search-input {
             width: 100%;
             padding: 10px 14px 10px 40px;
@@ -714,45 +782,83 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
         
         /* Cards Grid */
-        .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+            gap: 20px;
+        }
         .pwd-card {
             background: var(--card-glass);
             border: 1px solid var(--card-border);
             border-radius: var(--radius);
-            padding: 22px;
+            padding: 20px;
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .pwd-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-3px);
             border-color: rgba(56, 189, 248, 0.5);
             box-shadow: 0 12px 35px rgba(56, 189, 248, 0.2), 0 0 20px rgba(129, 140, 248, 0.15);
         }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-        .card-title { font-size: 18px; font-weight: 600; color: #FFFFFF; text-shadow: 0 0 10px rgba(255, 255, 255, 0.15); }
-        .card-url { font-size: 12px; color: var(--accent-cyan); text-decoration: none; word-break: break-all; margin-top: 4px; display: inline-block; transition: 0.2s; }
-        .card-url:hover { text-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
-        .card-actions { display: flex; gap: 6px; }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #FFFFFF;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
+            word-break: break-word;
+        }
+        .card-url {
+            font-size: 12px;
+            color: var(--accent-cyan);
+            text-decoration: none;
+            word-break: break-all;
+            margin-top: 4px;
+            display: inline-block;
+            transition: 0.2s;
+        }
+        .card-url:hover {
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+        }
+        .card-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
         .icon-btn {
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 8px 10px;
+            min-width: 36px;
+            min-height: 36px;
             border-radius: 8px;
             cursor: pointer;
             color: var(--text-sub);
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
-        .icon-btn:hover {
+        .icon-btn:hover, .icon-btn:active {
             background: rgba(129, 140, 248, 0.2);
             color: var(--accent-cyan);
             border-color: rgba(56, 189, 248, 0.4);
             box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
         }
-        .icon-btn.delete:hover {
+        .icon-btn.delete:hover, .icon-btn.delete:active {
             color: var(--accent-pink);
             background: rgba(244, 63, 94, 0.15);
             border-color: rgba(244, 63, 94, 0.4);
@@ -763,8 +869,8 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             background: rgba(3, 7, 18, 0.7);
             border: 1px solid rgba(129, 140, 248, 0.25);
             border-radius: 10px;
-            padding: 12px 16px;
-            margin: 12px 0;
+            padding: 10px 14px;
+            margin: 10px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -772,40 +878,169 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             font-size: 14px;
             color: #38BDF8;
             box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+            gap: 8px;
         }
-        .account-row { font-size: 13px; color: var(--text-sub); margin-bottom: 8px; display: flex; justify-content: space-between; }
-        .notes-row { font-size: 12px; color: #64748B; margin-top: 12px; border-top: 1px dashed rgba(255, 255, 255, 0.1); padding-top: 10px; }
+        .pwd-text-val {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            user-select: all;
+        }
+        .account-row {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .account-val {
+            word-break: break-all;
+        }
+        .notes-row {
+            font-size: 12px;
+            color: #94A3B8;
+            margin-top: 10px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-top: 8px;
+            word-break: break-word;
+        }
+
+        /* Mobile Drawer / Offcanvas */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 18, 0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 90;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
+        }
+        .drawer-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .mobile-drawer {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: min(85vw, 300px);
+            height: 100%;
+            height: 100vh;
+            height: -webkit-fill-available;
+            background: rgba(15, 23, 42, 0.95);
+            border-left: 1px solid var(--card-border);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 95;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px) 16px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .mobile-drawer.active {
+            right: 0;
+        }
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .drawer-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 12px 14px;
+            margin-bottom: 6px;
+            border-radius: 10px;
+            color: var(--text-main);
+            background: transparent;
+            border: 1px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .drawer-menu-item:hover, .drawer-menu-item:active {
+            background: rgba(129, 140, 248, 0.15);
+            border-color: rgba(129, 140, 248, 0.3);
+            color: var(--accent-cyan);
+        }
+        .drawer-menu-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
 
         /* Cosmic Glass Modal */
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(3, 7, 18, 0.75);
+            background: rgba(3, 7, 18, 0.8);
             display: none;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 16px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .modal-box {
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(15, 23, 42, 0.95);
             width: 100%;
             max-width: 520px;
             border-radius: 20px;
-            padding: 30px;
+            padding: 24px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(99, 102, 241, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.15);
             animation: scaleIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
-        @keyframes scaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #FFFFFF; display: flex; align-items: center; gap: 10px; }
-        .form-group { margin-bottom: 18px; }
-        .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #CBD5E1; }
+        @keyframes scaleIn {
+            from { transform: scale(0.92); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #CBD5E1;
+        }
         .form-input {
             width: 100%;
-            padding: 11px 16px;
+            padding: 10px 14px;
             background: rgba(3, 7, 18, 0.7);
             border: 1px solid var(--card-border);
             border-radius: 10px;
@@ -819,13 +1054,25 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             box-shadow: 0 0 15px rgba(56, 189, 248, 0.35);
             background: rgba(3, 7, 18, 0.9);
         }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 26px; }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
 
         /* Login Screen */
-        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: 85vh; }
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 85vh;
+            padding: 16px;
+        }
         .login-card {
-            background: rgba(15, 23, 42, 0.75);
-            padding: 42px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 36px 30px;
             border-radius: 24px;
             width: 100%;
             max-width: 440px;
@@ -847,16 +1094,16 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             background: linear-gradient(90deg, #6366F1, #A855F7, #EC4899, #38BDF8);
         }
         .login-logo {
-            width: 72px;
-            height: 72px;
-            border-radius: 20px;
+            width: 64px;
+            height: 64px;
+            border-radius: 18px;
             background: linear-gradient(135deg, #6366F1, #A855F7, #EC4899);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 34px;
-            margin: 0 auto 22px;
+            font-size: 30px;
+            margin: 0 auto 18px;
             box-shadow: 0 0 25px rgba(168, 85, 247, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
             animation: pulseGlow 4s infinite alternate;
@@ -871,22 +1118,119 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-width: calc(100vw - 32px);
+            pointer-events: none;
         }
         .cosmic-toast {
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(15, 23, 42, 0.95);
             border: 1px solid var(--accent-cyan);
             box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
             color: #FFFFFF;
-            padding: 12px 20px;
+            padding: 12px 18px;
             border-radius: 12px;
-            font-size: 14px;
+            font-size: 13px;
             display: flex;
             align-items: center;
             gap: 10px;
             backdrop-filter: blur(10px);
             animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+            word-break: break-word;
         }
-        @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes toastIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 992px) {
+            .navbar {
+                padding: 10px 16px;
+            }
+            .user-nav-desktop {
+                display: none;
+            }
+            .user-nav-mobile {
+                display: flex;
+            }
+            .brand-title .badge-secure {
+                display: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 8px 12px;
+            }
+            .logo-icon {
+                width: 34px;
+                height: 34px;
+                min-width: 34px;
+                font-size: 16px;
+                border-radius: 10px;
+            }
+            .brand-title {
+                font-size: 16px;
+            }
+            .container {
+                padding: 0 12px;
+                margin: 14px auto;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .stat-card {
+                padding: 14px 16px;
+            }
+            .stat-value {
+                font-size: 20px;
+            }
+            .action-bar {
+                padding: 12px 14px;
+                gap: 10px;
+            }
+            .search-box {
+                max-width: 100%;
+                min-width: 100%;
+            }
+            .btn-action-add {
+                width: 100%;
+            }
+            .grid-cards {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .pwd-card {
+                padding: 16px;
+            }
+            .modal-box {
+                padding: 18px 14px;
+                border-radius: 16px;
+                max-height: 85vh;
+            }
+            .modal-actions button {
+                flex: 1;
+            }
+            .login-card {
+                padding: 28px 18px;
+                border-radius: 20px;
+            }
+            #toastContainer {
+                bottom: 16px;
+                right: 16px;
+                left: 16px;
+                align-items: center;
+            }
+            .cosmic-toast {
+                width: 100%;
+                justify-content: center;
+            }
+            /* iOS Safari font zoom fix */
+            .form-input, .search-input {
+                font-size: 16px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -897,12 +1241,58 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 <div id="toastContainer"></div>
 
+<!-- Mobile Drawer Backdrop & Menu -->
+<div id="drawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
+<div id="mobileDrawer" class="mobile-drawer">
+    <div class="drawer-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="logo-icon" style="width: 32px; height: 32px; font-size: 16px;"><i class="fa-solid fa-user-astronaut"></i></div>
+            <div style="font-size: 15px; font-weight: 700; color: #FFFFFF;" id="drawerUserLabel">管理员</div>
+        </div>
+        <button class="icon-btn" onclick="closeDrawer()" title="关闭菜单"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    
+    <div style="margin-bottom: 12px;">
+        <a href="/download/app.apk" class="btn btn-app" style="width: 100%; justify-content: center;" onclick="closeDrawer()">
+            <i class="fa-brands fa-android"></i> 下载安卓客户端
+        </a>
+    </div>
+
+    <button class="drawer-menu-item" onclick="closeDrawer(); showAddModal();">
+        <i class="fa-solid fa-plus" style="color: var(--accent-cyan);"></i> 添加新记录
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); showUpdateModal();">
+        <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-cyan);"></i> 检查系统更新
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); showSecurityLogsModal();">
+        <i class="fa-solid fa-shield-virus" style="color: var(--accent-pink);"></i> 安全审计日志
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); showChangePwdModal();">
+        <i class="fa-solid fa-lock" style="color: #FCD34D;"></i> 修改登录密码
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); showRotateKeyModal();">
+        <i class="fa-solid fa-key" style="color: #A855F7;"></i> 更换主私钥
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); exportData();">
+        <i class="fa-solid fa-download" style="color: #34D399;"></i> 导出备份数据
+    </button>
+    <button class="drawer-menu-item" onclick="closeDrawer(); showImportModal();">
+        <i class="fa-solid fa-upload" style="color: #38BDF8;"></i> 导入恢复数据
+    </button>
+
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+        <button class="drawer-menu-item" style="color: var(--accent-pink);" onclick="closeDrawer(); doLogout();">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> 退出安全登录
+        </button>
+    </div>
+</div>
+
 <!-- Login Section -->
 <div id="loginSection" class="container login-wrapper">
     <div class="login-card">
         <div class="login-logo"><i class="fa-solid fa-user-astronaut"></i></div>
-        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #FFFFFF; text-shadow: 0 0 15px rgba(255,255,255,0.3);">星空密码管理器</h2>
-        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 28px;">服务端全权安全加解密控制台 (Cosmic Vault)</p>
+        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #FFFFFF; text-shadow: 0 0 15px rgba(255,255,255,0.3);">星空密码管理器</h2>
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 24px;">服务端全权安全加解密控制台 (Cosmic Vault)</p>
         <div class="form-group" style="text-align: left;">
             <label class="form-label"><i class="fa-solid fa-user-shield" style="color: var(--accent-cyan);"></i> 管理员用户名</label>
             <input type="text" id="loginUsername" class="form-input" value="jason" placeholder="请输入用户名" onkeyup="if(event.key==='Enter')doLogin()">
@@ -911,15 +1301,15 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <label class="form-label"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 管理员密码</label>
             <input type="password" id="loginPassword" class="form-input" value="admin@1234" placeholder="请输入密码" onkeyup="if(event.key==='Enter')doLogin()">
         </div>
-        <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; margin-top: 10px;" onclick="doLogin()">
+        <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 8px;" onclick="doLogin()">
             <i class="fa-solid fa-meteor"></i> 启 动 星 空 控 制 台
         </button>
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 18px;">
             <a href="/download/app.apk" class="btn btn-app" style="width: 100%; justify-content: center;">
                 <i class="fa-brands fa-android"></i> 📱 下载卡通版安卓客户端 (APK)
             </a>
         </div>
-        <div id="loginMsg" style="color: var(--accent-pink); font-size: 13px; margin-top: 16px; font-weight: 500;"></div>
+        <div id="loginMsg" style="color: var(--accent-pink); font-size: 13px; margin-top: 14px; font-weight: 500;"></div>
     </div>
 </div>
 
@@ -928,22 +1318,35 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <nav class="navbar">
         <div class="logo-group">
             <div class="logo-icon"><i class="fa-solid fa-user-astronaut"></i></div>
-            <div>
-                <div class="brand-title">Cosmic Password Vault <span class="badge-secure"><i class="fa-solid fa-shield-halved"></i> PBKDF2 + AES-256-GCM</span></div>
+            <div class="brand-title">
+                <span>Cosmic Vault</span>
+                <span class="badge-secure"><i class="fa-solid fa-shield-halved"></i> PBKDF2 + AES-256-GCM</span>
             </div>
         </div>
-        <div class="user-nav">
+        
+        <!-- Desktop Nav Items -->
+        <div class="user-nav-desktop">
             <a href="/download/app.apk" class="btn btn-app" title="下载最新安卓版 APP">
                 <i class="fa-brands fa-android"></i> 下载 APP
             </a>
-            <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel"></span>
+            <span style="font-size: 13px; color: var(--text-sub); margin: 0 4px;" id="currentUserLabel"></span>
             <button class="btn btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan);" onclick="showUpdateModal()"><i class="fa-solid fa-cloud-arrow-down"></i> 检查更新</button>
             <button class="btn btn-outline" style="border-color: rgba(244, 63, 94, 0.5); color: #FDA4AF;" onclick="showSecurityLogsModal()"><i class="fa-solid fa-shield-virus"></i> 安全审计日志</button>
             <button class="btn btn-outline" onclick="showChangePwdModal()"><i class="fa-solid fa-lock"></i> 修改密码</button>
             <button class="btn btn-outline" onclick="showRotateKeyModal()"><i class="fa-solid fa-key"></i> 更换私钥</button>
             <button class="btn btn-outline" onclick="exportData()"><i class="fa-solid fa-download"></i> 导出</button>
             <button class="btn btn-outline" onclick="showImportModal()"><i class="fa-solid fa-upload"></i> 导入</button>
-            <button class="btn btn-outline" onclick="doLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+            <button class="btn btn-outline" onclick="doLogout()" title="退出登录"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+        </div>
+
+        <!-- Mobile Nav Hamburger -->
+        <div class="user-nav-mobile">
+            <a href="/download/app.apk" class="icon-btn" style="color: #34D399; border-color: rgba(16,185,129,0.3);" title="下载客户端">
+                <i class="fa-brands fa-android"></i>
+            </a>
+            <button class="icon-btn" onclick="openDrawer()" title="打开菜单">
+                <i class="fa-solid fa-bars" style="font-size: 17px; color: var(--text-main);"></i>
+            </button>
         </div>
     </nav>
 
@@ -956,11 +1359,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             </div>
             <div class="stat-card">
                 <div class="stat-label"><i class="fa-solid fa-shield-virus" style="color: #A855F7;"></i> 服务端主加密密钥</div>
-                <div class="stat-value" style="font-size: 15px; font-family: monospace; color: #38BDF8;" id="statKeyPreview">Loading...</div>
+                <div class="stat-value" style="font-size: 14px; font-family: monospace; color: #38BDF8;" id="statKeyPreview">Loading...</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label"><i class="fa-solid fa-satellite" style="color: #34D399;"></i> 安全防护状态</div>
-                <div class="stat-value" style="color: #34D399; font-size: 18px;"><i class="fa-solid fa-circle-check"></i> 星空全权加密中</div>
+                <div class="stat-value" style="color: #34D399; font-size: 16px;"><i class="fa-solid fa-circle-check"></i> 星空全权加密中</div>
             </div>
         </div>
 
@@ -970,7 +1373,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" class="search-input" placeholder="搜索网站名称、网址或账号..." oninput="renderPasswords()">
             </div>
-            <button class="btn btn-primary" onclick="showAddModal()"><i class="fa-solid fa-plus"></i> 添加新密码记录</button>
+            <button class="btn btn-primary btn-action-add" onclick="showAddModal()"><i class="fa-solid fa-plus"></i> 添加新密码记录</button>
         </div>
 
         <!-- Cards Container -->
@@ -981,7 +1384,10 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Add / Edit Password -->
 <div id="pwdModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title" id="modalTitle"><i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" id="modalTitle" style="margin-bottom: 0;"><i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录</h3>
+            <button class="icon-btn" onclick="closeModal('pwdModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
         <input type="hidden" id="editId">
         <input type="hidden" id="mVersion">
         <div class="form-group">
@@ -997,7 +1403,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <input type="text" id="mUsername" class="form-input" placeholder="例如: admin@example.com">
         </div>
         <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <label class="form-label" style="margin-bottom: 0;">密码 (由服务端 AES-256-GCM 加密) *</label>
                 <a href="javascript:void(0)" style="font-size: 12px; color: var(--accent-cyan); text-decoration: none;" onclick="generateRandomPwd()"><i class="fa-solid fa-dice"></i> 生成强密码</a>
             </div>
@@ -1017,7 +1423,10 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Change Password -->
 <div id="changePwdModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 修改管理员登录密码</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 修改管理员登录密码</h3>
+            <button class="icon-btn" onclick="closeModal('changePwdModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
         <div class="form-group">
             <label class="form-label">当前原密码 *</label>
             <input type="password" id="cpOldPwd" class="form-input" placeholder="输入当前登录密码">
@@ -1040,8 +1449,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Rotate Key -->
 <div id="rotateModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title"><i class="fa-solid fa-arrows-rotate" style="color: #A855F7;"></i> 一键更换主加密私钥</h3>
-        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-arrows-rotate" style="color: #A855F7;"></i> 一键更换主加密私钥</h3>
+            <button class="icon-btn" onclick="closeModal('rotateModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.5;">
             服务端将自动溯源历史密钥解密所有存量密码，并使用新私钥全量重新加密，保障绝对安全。
         </p>
         <div class="form-group">
@@ -1049,7 +1461,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <input type="text" id="rotOldKey" class="form-input" style="font-family: monospace; color: #38BDF8;">
         </div>
         <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <label class="form-label" style="margin-bottom: 0;">新加密主私钥 *</label>
                 <a href="javascript:void(0)" style="font-size: 12px; color: var(--accent-cyan); text-decoration: none;" onclick="genNewRotateKey()"><i class="fa-solid fa-wand-magic-sparkles"></i> 随机生成</a>
             </div>
@@ -1065,14 +1477,17 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Import -->
 <div id="importModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title"><i class="fa-solid fa-file-import" style="color: var(--accent-cyan);"></i> 导入私钥与密码记录</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-file-import" style="color: var(--accent-cyan);"></i> 导入私钥与密码记录</h3>
+            <button class="icon-btn" onclick="closeModal('importModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
         <div class="form-group">
             <label class="form-label">指定主私钥 (可选，将更新服务端私钥)</label>
             <input type="text" id="impKey" class="form-input" style="font-family: monospace; color: #38BDF8;" placeholder="输入指定私钥">
         </div>
         <div class="form-group">
             <label class="form-label">JSON 导入数据 *</label>
-            <textarea id="impJson" class="form-input" rows="6" style="font-family: monospace; font-size: 12px; color: #38BDF8;" placeholder='{"private_key": "...", "records": [...] }'></textarea>
+            <textarea id="impJson" class="form-input" rows="5" style="font-family: monospace; font-size: 12px; color: #38BDF8;" placeholder='{"private_key": "...", "records": [...] }'></textarea>
         </div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('importModal')">取消</button>
@@ -1084,15 +1499,15 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: System Smooth Update -->
 <div id="updateModal" class="modal-overlay">
     <div class="modal-box" style="max-width: 600px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
             <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-cyan);"></i> 服务端在线平滑更新</h3>
             <button class="icon-btn" onclick="closeModal('updateModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 14px; line-height: 1.5;">
             从 GitHub Release 自动拉取最新服务端程序并平滑重启。系统在更新前<b>自动为数据库建立快照备份</b>，保障所有密码与私钥数据绝对零丢失。
         </p>
 
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;">
                 <span style="color: var(--text-sub);">当前运行版本:</span>
                 <span style="font-family: monospace; font-weight: 600; color: #FFFFFF;" id="updCurVer">v1.0.0</span>
@@ -1107,12 +1522,12 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             </div>
         </div>
 
-        <div id="updNotesBox" style="display: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; max-height: 140px; overflow-y: auto; font-size: 12px; color: var(--text-sub); margin-bottom: 16px;">
+        <div id="updNotesBox" style="display: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; max-height: 140px; overflow-y: auto; font-size: 12px; color: var(--text-sub); margin-bottom: 14px;">
             <div style="font-weight: 600; color: #FFFFFF; margin-bottom: 4px;">发布说明 / Release Notes:</div>
             <div id="updNotesContent" style="white-space: pre-wrap; line-height: 1.5;"></div>
         </div>
 
-        <div id="updProgressBox" style="display: none; text-align: center; padding: 15px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; margin-bottom: 16px;">
+        <div id="updProgressBox" style="display: none; text-align: center; padding: 15px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; margin-bottom: 14px;">
             <div style="color: var(--accent-cyan); font-size: 14px; font-weight: 600; margin-bottom: 6px;"><i class="fa-solid fa-spinner fa-spin"></i> <span id="updProgressText">正在执行平滑更新...</span></div>
             <div style="color: var(--text-sub); font-size: 12px;">数据库已备份，服务将在 5 秒后自动刷新...</div>
         </div>
@@ -1127,44 +1542,44 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Security Audit Logs -->
 <div id="securityLogsModal" class="modal-overlay">
     <div class="modal-box" style="max-width: 920px; width: 95%;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
             <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-shield-virus" style="color: var(--accent-pink);"></i> 安全审计日志与风控看板</h3>
             <button class="icon-btn" onclick="closeModal('securityLogsModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         <!-- 3 Stats Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
-            <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 12px 16px;">
-                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-pink);"></i> 累计失败尝试</div>
-                <div style="font-size: 24px; font-weight: 700; color: #FDA4AF; margin-top: 4px;" id="secStatFailed">0</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px;">
+            <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 10px 14px;">
+                <div style="font-size: 11px; color: var(--text-sub);"><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-pink);"></i> 累计失败尝试</div>
+                <div style="font-size: 20px; font-weight: 700; color: #FDA4AF; margin-top: 2px;" id="secStatFailed">0</div>
             </div>
-            <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 16px;">
-                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-network-wired" style="color: var(--accent-cyan);"></i> 异常来源 IP 数</div>
-                <div style="font-size: 24px; font-weight: 700; color: #38BDF8; margin-top: 4px;" id="secStatIps">0</div>
+            <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 10px 14px;">
+                <div style="font-size: 11px; color: var(--text-sub);"><i class="fa-solid fa-network-wired" style="color: var(--accent-cyan);"></i> 异常来源 IP 数</div>
+                <div style="font-size: 20px; font-weight: 700; color: #38BDF8; margin-top: 2px;" id="secStatIps">0</div>
             </div>
-            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 12px 16px;">
-                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-user-lock" style="color: #F59E0B;"></i> 当前封禁目标</div>
-                <div style="font-size: 24px; font-weight: 700; color: #FCD34D; margin-top: 4px;" id="secStatLocked">0</div>
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 10px 14px;">
+                <div style="font-size: 11px; color: var(--text-sub);"><i class="fa-solid fa-user-lock" style="color: #F59E0B;"></i> 当前封禁目标</div>
+                <div style="font-size: 20px; font-weight: 700; color: #FCD34D; margin-top: 2px;" id="secStatLocked">0</div>
             </div>
         </div>
 
         <!-- Active Lockouts Banner -->
-        <div id="activeLockoutSection" style="display: none; background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent-pink); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
-            <div style="font-size: 13px; font-weight: 600; color: #FDA4AF; margin-bottom: 8px;"><i class="fa-solid fa-ban"></i> 当前正处于安全锁定中的目标：</div>
-            <div id="activeLockoutList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+        <div id="activeLockoutSection" style="display: none; background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent-pink); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 600; color: #FDA4AF; margin-bottom: 6px;"><i class="fa-solid fa-ban"></i> 当前正处于安全锁定中的目标：</div>
+            <div id="activeLockoutList" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
         </div>
 
-        <!-- Logs Table -->
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 16px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                <thead style="background: rgba(255,255,255,0.05); position: sticky; top: 0; backdrop-filter: blur(10px);">
+        <!-- Logs Table with Responsive Scroll Wrapper -->
+        <div style="max-height: 360px; overflow-x: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 14px;">
+            <table style="width: 100%; min-width: 600px; border-collapse: collapse; font-size: 12px; text-align: left;">
+                <thead style="background: rgba(255,255,255,0.05); position: sticky; top: 0; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
                     <tr>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">时间 (UTC)</th>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">来源 IP</th>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">尝试用户名</th>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">状态</th>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">拦截原因</th>
-                        <th style="padding: 10px 14px; color: var(--text-sub);">客户端特征</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">时间 (UTC)</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">来源 IP</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">尝试用户名</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">状态</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">拦截原因</th>
+                        <th style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">客户端特征</th>
                     </tr>
                 </thead>
                 <tbody id="securityLogsTableBody">
@@ -1175,7 +1590,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         <div class="modal-actions" style="justify-content: space-between;">
             <button class="btn btn-outline" style="border-color: rgba(244,63,94,0.5); color: #FDA4AF;" onclick="clearSecurityLogs()"><i class="fa-solid fa-trash-can"></i> 清空日志</button>
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <button class="btn btn-outline" onclick="loadSecurityLogs()"><i class="fa-solid fa-arrows-rotate"></i> 刷新</button>
                 <button class="btn btn-primary" onclick="closeModal('securityLogsModal')">关闭</button>
             </div>
@@ -1188,7 +1603,8 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     const canvas = document.getElementById("starfield");
     const ctx = canvas.getContext("2d");
     let stars = [];
-    const STAR_COUNT = 160;
+    const isMobile = window.innerWidth < 768;
+    const STAR_COUNT = isMobile ? 80 : 160;
 
     function resizeCanvas() {
         canvas.width = window.innerWidth;
@@ -1242,19 +1658,29 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     initStars();
     animateStars();
 
+    // --- Drawer Controls ---
+    function openDrawer() {
+        document.getElementById("drawerOverlay").classList.add("active");
+        document.getElementById("mobileDrawer").classList.add("active");
+    }
+    function closeDrawer() {
+        document.getElementById("drawerOverlay").classList.remove("active");
+        document.getElementById("mobileDrawer").classList.remove("active");
+    }
+
     // --- Toast Notifications ---
     function showToast(msg, icon = "fa-circle-check") {
         const container = document.getElementById("toastContainer");
         const toast = document.createElement("div");
         toast.className = "cosmic-toast";
-        toast.innerHTML = `<i class="fa-solid ${icon}" style="color: var(--accent-cyan);"></i> <span>${msg}</span>`;
+        toast.innerHTML = `<i class="fa-solid ${icon}" style="color: var(--accent-cyan); font-size: 16px;"></i> <span>${msg}</span>`;
         container.appendChild(toast);
         setTimeout(() => {
             toast.style.opacity = "0";
             toast.style.transform = "translateY(20px)";
             toast.style.transition = "all 0.3s";
             setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        }, 3200);
     }
 
     // --- State & API ---
@@ -1299,6 +1725,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             authToken = res.token;
             localStorage.setItem("pwd_token", authToken);
             document.getElementById("currentUserLabel").innerText = "用户: " + res.username;
+            document.getElementById("drawerUserLabel").innerText = "用户: " + res.username;
             showToast("登录成功，欢迎进入星空密码控制台！");
             initApp();
         } catch (e) {
@@ -1317,6 +1744,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         try {
             const me = await api("/api/auth/me");
             document.getElementById("currentUserLabel").innerText = "用户: " + me.username;
+            document.getElementById("drawerUserLabel").innerText = "用户: " + me.username;
         } catch (e) {
             doLogout();
             return;
@@ -1342,8 +1770,6 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             allRecords = res.records || [];
             currentGlobalVersion = res.global_version !== undefined ? res.global_version : 0;
             document.getElementById("statTotalCount").innerText = allRecords.length;
-            const badge = document.getElementById("statGlobalVersion");
-            if (badge) badge.innerText = "v" + currentGlobalVersion;
             renderPasswords();
         } catch (e) {
             console.error("loadPasswords error:", e);
@@ -1362,7 +1788,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         );
 
         if (filtered.length === 0) {
-            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-sub);"><i class="fa-solid fa-satellite-dish" style="font-size: 32px; margin-bottom: 12px; color: rgba(255,255,255,0.2);"></i><div>暂无匹配的星空密码记录</div></div>`;
+            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 48px 16px; color: var(--text-sub);"><i class="fa-solid fa-satellite-dish" style="font-size: 32px; margin-bottom: 12px; color: rgba(255,255,255,0.2);"></i><div>暂无匹配的星空密码记录</div></div>`;
             return;
         }
 
@@ -1370,25 +1796,27 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             const card = document.createElement("div");
             card.className = "pwd-card";
             card.innerHTML = `
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">${escapeHtml(r.name)} <span style="font-size: 11px; background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); padding: 2px 7px; border-radius: 4px; font-weight: normal;">v${r.version !== undefined ? r.version : 0}</span></div>
-                        ${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" class="card-url"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(r.url)}</a>` : ""}
+                <div>
+                    <div class="card-header">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="card-title">${escapeHtml(r.name)} <span style="font-size: 11px; background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-weight: normal;">v${r.version !== undefined ? r.version : 0}</span></div>
+                            ${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" class="card-url"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(r.url)}</a>` : ""}
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn" title="编辑" onclick="editPassword('${r.id}')"><i class="fa-solid fa-pen"></i></button>
+                            <button class="icon-btn delete" title="删除" onclick="deletePassword('${r.id}', '${escapeHtml(r.name)}')"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                     </div>
-                    <div class="card-actions">
-                        <button class="icon-btn" title="编辑" onclick="editPassword('${r.id}')"><i class="fa-solid fa-pen"></i></button>
-                        <button class="icon-btn delete" title="删除" onclick="deletePassword('${r.id}', '${escapeHtml(r.name)}')"><i class="fa-solid fa-trash"></i></button>
+                    <div class="account-row">
+                        <span class="account-val">账号: <strong style="color: #FFFFFF;">${escapeHtml(r.username || "(无)")}</strong></span>
+                        <a href="javascript:void(0)" onclick="copyText('${escapeJs(r.username)}', '账号')" style="color: var(--accent-cyan); text-decoration: none; font-size: 12px; flex-shrink: 0;"><i class="fa-regular fa-copy"></i> 复制</a>
                     </div>
-                </div>
-                <div class="account-row">
-                    <span>账号: <strong style="color: #FFFFFF;">${escapeHtml(r.username || "(无)")}</strong></span>
-                    <a href="javascript:void(0)" onclick="copyText('${escapeJs(r.username)}', '账号')" style="color: var(--accent-cyan); text-decoration: none;"><i class="fa-regular fa-copy"></i> 复制</a>
-                </div>
-                <div class="pwd-field">
-                    <span id="pwdText_${r.id}" style="letter-spacing: 2px; font-family: monospace;">••••••••</span>
-                    <div style="display: flex; gap: 4px;">
-                        <button class="icon-btn" id="toggleEye_${r.id}" title="显示明文密码" onclick="togglePasswordVisibility('${r.id}')"><i class="fa-solid fa-eye" id="eyeIcon_${r.id}"></i></button>
-                        <button class="icon-btn" title="复制密码 (30秒自动清除)" onclick="copyText('${escapeJs(r.plain_password || "")}', '密码')"><i class="fa-solid fa-copy"></i></button>
+                    <div class="pwd-field">
+                        <span id="pwdText_${r.id}" class="pwd-text-val" style="letter-spacing: 2px;">••••••••</span>
+                        <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                            <button class="icon-btn" id="toggleEye_${r.id}" title="显示明文密码" onclick="togglePasswordVisibility('${r.id}')"><i class="fa-solid fa-eye" id="eyeIcon_${r.id}"></i></button>
+                            <button class="icon-btn" title="复制密码" onclick="copyText('${escapeJs(r.plain_password || "")}', '密码')"><i class="fa-solid fa-copy"></i></button>
+                        </div>
                     </div>
                 </div>
                 ${r.notes ? `<div class="notes-row"><i class="fa-regular fa-note-sticky"></i> 备注: ${escapeHtml(r.notes)}</div>` : ""}
@@ -1457,10 +1885,9 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
 
-        // Disallow duplicate website name on frontend
         const dupeItem = allRecords.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase() && p.id !== id && !p.is_deleted);
         if (dupeItem) {
-            showToast(`⚠️ 已存在相同名称「${escapeHtml(name)}」的记录，不允许重复添加！请直接在该记录上修改。`, "fa-triangle-exclamation");
+            showToast(`⚠️ 已存在相同名称「${escapeHtml(name)}」的记录，不允许重复添加！`, "fa-triangle-exclamation");
             return;
         }
 
@@ -1489,7 +1916,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 showToast(`已删除「${name}」的记录`);
                 await loadPasswords();
             } catch (e) {
-                showToast("⚠️ 删除失败：" + e.message + "，已自动重新同步服务端数据与版本号！", "fa-triangle-exclamation");
+                showToast("⚠️ 删除失败：" + e.message + "，已自动重新同步服务端数据！", "fa-triangle-exclamation");
                 await loadPasswords();
             }
         }
@@ -1627,7 +2054,6 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             pwdArr.push(all[randomValues[i] % all.length]);
         }
 
-        // Shuffle
         for (let i = pwdArr.length - 1; i > 0; i--) {
             const j = randomValues[i] % (i + 1);
             const temp = pwdArr[i];
@@ -1655,7 +2081,6 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
         let copied = false;
-        // 1. Try modern Async Clipboard API (for HTTPS / localhost)
         if (navigator.clipboard && window.isSecureContext) {
             try {
                 await navigator.clipboard.writeText(text);
@@ -1664,7 +2089,6 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 console.warn("navigator.clipboard error, fallback to execCommand:", err);
             }
         }
-        // 2. Fallback to execCommand (works in HTTP intranet / non-secure contexts)
         if (!copied) {
             try {
                 const textArea = document.createElement("textarea");
@@ -1784,15 +2208,15 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 lockoutSec.style.display = "block";
                 let chipsHtml = "";
                 activeIps.forEach(item => {
-                    chipsHtml += `<div style="background: rgba(244,63,94,0.2); border: 1px solid var(--accent-pink); padding: 5px 12px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
-                        <span>IP: <b style="font-family: monospace;">${escapeHtml(item.ip)}</b> (已封禁，剩余 ${item.remaining_seconds}s)</span>
-                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-color: rgba(244,63,94,0.5); color: #FDA4AF;" onclick="unlockTarget('${escapeJs(item.ip)}', null)">立即解封</button>
+                    chipsHtml += `<div style="background: rgba(244,63,94,0.2); border: 1px solid var(--accent-pink); padding: 4px 10px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span>IP: <b style="font-family: monospace;">${escapeHtml(item.ip)}</b> (剩余 ${item.remaining_seconds}s)</span>
+                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; min-height: 24px; border-color: rgba(244,63,94,0.5); color: #FDA4AF;" onclick="unlockTarget('${escapeJs(item.ip)}', null)">解封</button>
                     </div>`;
                 });
                 activeUsers.forEach(item => {
-                    chipsHtml += `<div style="background: rgba(245,158,11,0.2); border: 1px solid #F59E0B; padding: 5px 12px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
-                        <span>账号: <b style="font-family: monospace;">${escapeHtml(item.username)}</b> (已锁定，剩余 ${item.remaining_seconds}s)</span>
-                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-color: rgba(245,158,11,0.5); color: #FCD34D;" onclick="unlockTarget(null, '${escapeJs(item.username)}')">立即解锁</button>
+                    chipsHtml += `<div style="background: rgba(245,158,11,0.2); border: 1px solid #F59E0B; padding: 4px 10px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span>账号: <b style="font-family: monospace;">${escapeHtml(item.username)}</b> (剩余 ${item.remaining_seconds}s)</span>
+                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; min-height: 24px; border-color: rgba(245,158,11,0.5); color: #FCD34D;" onclick="unlockTarget(null, '${escapeJs(item.username)}')">解锁</button>
                     </div>`;
                 });
                 lockoutList.innerHTML = chipsHtml;
@@ -1809,23 +2233,23 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             res.logs.forEach(l => {
                 let statusBadge = "";
                 if (l.status === "FAILED") {
-                    statusBadge = `<span style="background: rgba(244,63,94,0.15); color: var(--accent-pink); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">失败 (401)</span>`;
+                    statusBadge = `<span style="background: rgba(244,63,94,0.15); color: var(--accent-pink); padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;">失败 (401)</span>`;
                 } else if (l.status === "LOCKED_OUT") {
-                    statusBadge = `<span style="background: rgba(239,68,68,0.25); color: #FF4D4D; border: 1px solid #EF4444; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">封禁拦截 (429)</span>`;
+                    statusBadge = `<span style="background: rgba(239,68,68,0.25); color: #FF4D4D; border: 1px solid #EF4444; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;">封禁 (429)</span>`;
                 } else {
-                    statusBadge = `<span style="background: rgba(16,185,129,0.15); color: #10B981; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">成功 (200)</span>`;
+                    statusBadge = `<span style="background: rgba(16,185,129,0.15); color: #10B981; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;">成功 (200)</span>`;
                 }
 
                 const timeStr = l.created_at ? l.created_at.replace("T", " ").substring(0, 19) : "";
-                const uaShort = l.user_agent ? (l.user_agent.length > 38 ? escapeHtml(l.user_agent.substring(0, 38)) + "..." : escapeHtml(l.user_agent)) : "-";
+                const uaShort = l.user_agent ? (l.user_agent.length > 30 ? escapeHtml(l.user_agent.substring(0, 30)) + "..." : escapeHtml(l.user_agent)) : "-";
 
                 html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 14px; color: var(--text-sub); white-space: nowrap; font-family: monospace;">${timeStr}</td>
-                    <td style="padding: 10px 14px; font-family: monospace; font-weight: 600; color: #FFFFFF;">${escapeHtml(l.ip)}</td>
-                    <td style="padding: 10px 14px; font-weight: 500; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(l.username_attempted)}</td>
-                    <td style="padding: 10px 14px;">${statusBadge}</td>
-                    <td style="padding: 10px 14px; color: var(--text-sub);">${escapeHtml(l.failure_reason)}</td>
-                    <td style="padding: 10px 14px; color: var(--text-sub); font-size: 11px;" title="${escapeHtml(l.user_agent)}">${uaShort}</td>
+                    <td style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap; font-family: monospace;">${timeStr}</td>
+                    <td style="padding: 9px 12px; font-family: monospace; font-weight: 600; color: #FFFFFF; white-space: nowrap;">${escapeHtml(l.ip)}</td>
+                    <td style="padding: 9px 12px; font-weight: 500; color: var(--accent-cyan); font-family: monospace; white-space: nowrap;">${escapeHtml(l.username_attempted)}</td>
+                    <td style="padding: 9px 12px;">${statusBadge}</td>
+                    <td style="padding: 9px 12px; color: var(--text-sub); white-space: nowrap;">${escapeHtml(l.failure_reason)}</td>
+                    <td style="padding: 9px 12px; color: var(--text-sub); font-size: 11px;" title="${escapeHtml(l.user_agent)}">${uaShort}</td>
                 </tr>`;
             });
             tbody.innerHTML = html;
