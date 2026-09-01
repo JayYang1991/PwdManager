@@ -50,6 +50,7 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          overwrite: true
           files: |
             dist/PwdManager.apk
             dist/pwdmanager-server.tar.gz
