@@ -276,114 +276,461 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <title>密码管理器 - Web安全控制台</title>
+    <title>星空密码管理器 - Web安全控制台</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #4F46E5;
-            --primary-hover: #4338CA;
-            --bg: #F8FAFC;
-            --card-bg: #FFFFFF;
-            --text-main: #0F172A;
-            --text-sub: #64748B;
-            --border: #E2E8F0;
-            --success: #10B981;
-            --danger: #EF4444;
-            --radius: 14px;
+            --cosmic-bg: #030712;
+            --nebula-1: #1E1B4B;
+            --nebula-2: #0F172A;
+            --primary: #818CF8;
+            --primary-glow: rgba(129, 140, 248, 0.4);
+            --accent-cyan: #38BDF8;
+            --accent-pink: #F43F5E;
+            --card-glass: rgba(15, 23, 42, 0.7);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --card-hover-border: rgba(129, 140, 248, 0.5);
+            --text-main: #F8FAFC;
+            --text-sub: #94A3B8;
+            --text-glow: 0 0 10px rgba(255, 255, 255, 0.2);
+            --radius: 16px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
-        .navbar { background: #FFFFFF; border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
-        .logo-group { display: flex; align-items: center; gap: 12px; }
-        .logo-icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #6366F1, #4F46E5); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25); }
-        .brand-title { font-size: 20px; font-weight: 700; color: #1E293B; }
-        .badge-secure { background: #EEF2FF; color: var(--primary); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
-        .user-nav { display: flex; align-items: center; gap: 12px; }
-        .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: #F1F5F9; }
-        .btn-app { background: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; font-weight: 600; }
-        .btn-app:hover { background: #D1FAE5; }
-        .container { max-width: 1200px; margin: 28px auto; padding: 0 20px; width: 100%; flex: 1; }
+        body {
+            background-color: var(--cosmic-bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+        }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 24px; }
-        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .stat-label { font-size: 13px; color: var(--text-sub); margin-bottom: 6px; }
-        .stat-value { font-size: 24px; font-weight: 700; color: var(--text-main); }
+        /* Starfield Canvas Background */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+        }
         
-        .action-bar { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-        .search-box { position: relative; width: 320px; }
-        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-sub); }
-        .search-input { width: 100%; padding: 8px 12px 8px 36px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; outline: none; }
-        .search-input:focus { border-color: var(--primary); }
-        
-        .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
-        .pwd-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); transition: transform 0.2s, box-shadow 0.2s; position: relative; }
-        .pwd-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .card-title { font-size: 17px; font-weight: 600; color: #1E293B; }
-        .card-url { font-size: 12px; color: #3B82F6; text-decoration: none; word-break: break-all; margin-top: 3px; display: inline-block; }
-        .card-actions { display: flex; gap: 6px; }
-        .icon-btn { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--text-sub); transition: 0.15s; }
-        .icon-btn:hover { background: #F1F5F9; color: var(--primary); }
-        .icon-btn.delete:hover { color: var(--danger); background: #FEE2E2; }
-        
-        .pwd-field { background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-family: monospace; font-size: 14px; }
-        .account-row { font-size: 13px; color: var(--text-sub); margin-bottom: 6px; display: flex; justify-content: space-between; }
-        .notes-row { font-size: 12px; color: #94A3B8; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+        /* Aurora / Nebula Ambient Gradients */
+        .nebula-glow {
+            position: fixed;
+            top: -20%;
+            left: 10%;
+            width: 80vw;
+            height: 60vh;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 40%, transparent 70%);
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+            animation: nebulaFloat 18s ease-in-out infinite alternate;
+        }
+        @keyframes nebulaFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(5%, 10%) scale(1.1); }
+        }
 
-        /* Modal */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: none; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(2px); }
-        .modal-box { background: white; width: 100%; max-width: 500px; border-radius: 16px; padding: 26px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); animation: scaleIn 0.2s ease-out; }
-        @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 18px; color: #1E293B; }
-        .form-group { margin-bottom: 16px; }
-        .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #475569; }
-        .form-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
-        .form-input:focus { border-color: var(--primary); }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+        /* Glass Navbar */
+        .navbar {
+            background: rgba(10, 15, 30, 0.75);
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 14px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        .logo-group { display: flex; align-items: center; gap: 14px; }
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6366F1, #A855F7, #EC4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 22px;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: pulseGlow 4s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 15px rgba(129, 140, 248, 0.4); }
+            100% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.6); }
+        }
+        .brand-title { font-size: 20px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.5px; }
+        .badge-secure {
+            background: rgba(129, 140, 248, 0.15);
+            border: 1px solid rgba(129, 140, 248, 0.4);
+            color: var(--accent-cyan);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+        }
+        
+        .user-nav { display: flex; align-items: center; gap: 12px; }
+        .btn {
+            padding: 9px 18px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366F1, #8B5CF6, #D946EF);
+            color: white;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(217, 70, 239, 0.6);
+            background: linear-gradient(135deg, #4F46E5, #7C3AED, #C026D3);
+        }
+        .btn-outline {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            backdrop-filter: blur(8px);
+        }
+        .btn-outline:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            transform: translateY(-1px);
+        }
+        .btn-app {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2));
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34D399;
+            font-weight: 600;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+        .btn-app:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(6, 182, 212, 0.4));
+            border-color: #34D399;
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .container {
+            max-width: 1240px;
+            margin: 28px auto;
+            padding: 0 24px;
+            width: 100%;
+            flex: 1;
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #6366F1, #A855F7, #EC4899);
+            opacity: 0.7;
+        }
+        .stat-card:hover {
+            border-color: var(--card-hover-border);
+            box-shadow: 0 10px 30px rgba(129, 140, 248, 0.25);
+            transform: translateY(-2px);
+        }
+        .stat-label { font-size: 13px; color: var(--text-sub); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .stat-value { font-size: 26px; font-weight: 700; color: #FFFFFF; text-shadow: 0 0 12px rgba(255, 255, 255, 0.2); }
+        
+        /* Action Bar */
+        .action-bar {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 18px 24px;
+            margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .search-box { position: relative; width: 340px; }
+        .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--accent-cyan); }
+        .search-input {
+            width: 100%;
+            padding: 10px 14px 10px 40px;
+            border-radius: 10px;
+            background: rgba(3, 7, 18, 0.6);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            background: rgba(3, 7, 18, 0.85);
+        }
+        
+        /* Cards Grid */
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+        .pwd-card {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 22px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .pwd-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 12px 35px rgba(56, 189, 248, 0.2), 0 0 20px rgba(129, 140, 248, 0.15);
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .card-title { font-size: 18px; font-weight: 600; color: #FFFFFF; text-shadow: 0 0 10px rgba(255, 255, 255, 0.15); }
+        .card-url { font-size: 12px; color: var(--accent-cyan); text-decoration: none; word-break: break-all; margin-top: 4px; display: inline-block; transition: 0.2s; }
+        .card-url:hover { text-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
+        .card-actions { display: flex; gap: 6px; }
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-sub);
+            transition: all 0.2s;
+        }
+        .icon-btn:hover {
+            background: rgba(129, 140, 248, 0.2);
+            color: var(--accent-cyan);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+        .icon-btn.delete:hover {
+            color: var(--accent-pink);
+            background: rgba(244, 63, 94, 0.15);
+            border-color: rgba(244, 63, 94, 0.4);
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.3);
+        }
+        
+        .pwd-field {
+            background: rgba(3, 7, 18, 0.7);
+            border: 1px solid rgba(129, 140, 248, 0.25);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: "JetBrains Mono", "Fira Code", monospace;
+            font-size: 14px;
+            color: #38BDF8;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+        .account-row { font-size: 13px; color: var(--text-sub); margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .notes-row { font-size: 12px; color: #64748B; margin-top: 12px; border-top: 1px dashed rgba(255, 255, 255, 0.1); padding-top: 10px; }
+
+        /* Cosmic Glass Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 18, 0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .modal-box {
+            background: rgba(15, 23, 42, 0.9);
+            width: 100%;
+            max-width: 520px;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(99, 102, 241, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            animation: scaleIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        @keyframes scaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #FFFFFF; display: flex; align-items: center; gap: 10px; }
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #CBD5E1; }
+        .form-input {
+            width: 100%;
+            padding: 11px 16px;
+            background: rgba(3, 7, 18, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            font-size: 14px;
+            color: #FFFFFF;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.35);
+            background: rgba(3, 7, 18, 0.9);
+        }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 26px; }
 
         /* Login Screen */
-        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-        .login-card { background: white; padding: 36px; border-radius: 20px; width: 100%; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); border: 1px solid var(--border); text-align: center; }
-        .login-logo { width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #6366F1, #4F46E5); display: flex; align-items: center; justify-content: center; color: white; font-size: 30px; margin: 0 auto 18px; }
+        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: 85vh; }
+        .login-card {
+            background: rgba(15, 23, 42, 0.75);
+            padding: 42px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 35px rgba(129, 140, 248, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #6366F1, #A855F7, #EC4899, #38BDF8);
+        }
+        .login-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #6366F1, #A855F7, #EC4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 34px;
+            margin: 0 auto 22px;
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: pulseGlow 4s infinite alternate;
+        }
+        
+        /* Cosmic Toast Notification */
+        #toastContainer {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .cosmic-toast {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+            color: #FFFFFF;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 <body>
 
+<!-- Interactive Starfield Canvas -->
+<canvas id="starfield"></canvas>
+<div class="nebula-glow"></div>
+
+<div id="toastContainer"></div>
+
+<!-- Login Section -->
 <div id="loginSection" class="container login-wrapper">
     <div class="login-card">
-        <div class="login-logo"><i class="fa-solid fa-shield-halved"></i></div>
-        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 8px;">密码管理器</h2>
-        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 26px;">服务端安全解密与管理控制台</p>
+        <div class="login-logo"><i class="fa-solid fa-user-astronaut"></i></div>
+        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #FFFFFF; text-shadow: 0 0 15px rgba(255,255,255,0.3);">星空密码管理器</h2>
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 28px;">服务端全权安全加解密控制台 (Cosmic Vault)</p>
         <div class="form-group" style="text-align: left;">
-            <label class="form-label">用户名</label>
+            <label class="form-label"><i class="fa-solid fa-user-shield" style="color: var(--accent-cyan);"></i> 管理员用户名</label>
             <input type="text" id="loginUsername" class="form-input" value="admin" placeholder="请输入用户名">
         </div>
         <div class="form-group" style="text-align: left;">
-            <label class="form-label">密码</label>
+            <label class="form-label"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 管理员密码</label>
             <input type="password" id="loginPassword" class="form-input" value="admin@1234" placeholder="请输入密码">
         </div>
-        <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="doLogin()">
-            <i class="fa-solid fa-lock-open"></i> 登 录 控 制 台
+        <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; margin-top: 10px;" onclick="doLogin()">
+            <i class="fa-solid fa-meteor"></i> 启 动 星 空 控 制 台
         </button>
         <div style="margin-top: 20px;">
             <a href="/download/app.apk" class="btn btn-app" style="width: 100%; justify-content: center;">
-                <i class="fa-brands fa-android"></i> 📱 下载安卓客户端 APK
+                <i class="fa-brands fa-android"></i> 📱 下载卡通版安卓客户端 (APK)
             </a>
         </div>
-        <div id="loginMsg" style="color: var(--danger); font-size: 13px; margin-top: 14px;"></div>
+        <div id="loginMsg" style="color: var(--accent-pink); font-size: 13px; margin-top: 16px; font-weight: 500;"></div>
     </div>
 </div>
 
+<!-- Main App Section -->
 <div id="appSection" style="display: none; flex-direction: column; min-height: 100vh;">
     <nav class="navbar">
         <div class="logo-group">
-            <div class="logo-icon"><i class="fa-solid fa-vault"></i></div>
+            <div class="logo-icon"><i class="fa-solid fa-user-astronaut"></i></div>
             <div>
-                <div class="brand-title">Password Manager <span class="badge-secure">服务端安全加密 (PBKDF2+AES-GCM)</span></div>
+                <div class="brand-title">Cosmic Password Vault <span class="badge-secure"><i class="fa-solid fa-shield-halved"></i> PBKDF2 + AES-256-GCM</span></div>
             </div>
         </div>
         <div class="user-nav">
@@ -402,16 +749,16 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-database"></i> 密码记录总数</div>
+                <div class="stat-label"><i class="fa-solid fa-database" style="color: var(--accent-cyan);"></i> 密码记录总数</div>
                 <div class="stat-value" id="statTotalCount">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-shield-virus"></i> 服务端主加密密钥</div>
-                <div class="stat-value" style="font-size: 15px; font-family: monospace;" id="statKeyPreview">Loading...</div>
+                <div class="stat-label"><i class="fa-solid fa-shield-virus" style="color: #A855F7;"></i> 服务端主加密密钥</div>
+                <div class="stat-value" style="font-size: 15px; font-family: monospace; color: #38BDF8;" id="statKeyPreview">Loading...</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-server"></i> 安全防护状态</div>
-                <div class="stat-value" style="color: var(--success); font-size: 18px;"><i class="fa-solid fa-circle-check"></i> 安全加固已启用</div>
+                <div class="stat-label"><i class="fa-solid fa-satellite" style="color: #34D399;"></i> 安全防护状态</div>
+                <div class="stat-value" style="color: #34D399; font-size: 18px;"><i class="fa-solid fa-circle-check"></i> 星空全权加密中</div>
             </div>
         </div>
 
@@ -432,7 +779,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Add / Edit Password -->
 <div id="pwdModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title" id="modalTitle">添加密码记录</h3>
+        <h3 class="modal-title" id="modalTitle"><i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录</h3>
         <input type="hidden" id="editId">
         <div class="form-group">
             <label class="form-label">网站 / 应用名称 *</label>
@@ -447,11 +794,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <input type="text" id="mUsername" class="form-input" placeholder="例如: admin@example.com">
         </div>
         <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label class="form-label" style="margin-bottom: 0;">密码 (由服务端加密存储) *</label>
-                <a href="javascript:void(0)" style="font-size: 12px; color: var(--primary); text-decoration: none;" onclick="generateRandomPwd()">生成强密码</a>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="form-label" style="margin-bottom: 0;">密码 (由服务端 AES-256-GCM 加密) *</label>
+                <a href="javascript:void(0)" style="font-size: 12px; color: var(--accent-cyan); text-decoration: none;" onclick="generateRandomPwd()"><i class="fa-solid fa-dice"></i> 生成强密码</a>
             </div>
-            <input type="text" id="mPassword" class="form-input" style="font-family: monospace;" placeholder="请输入或生成密码">
+            <input type="text" id="mPassword" class="form-input" style="font-family: monospace; color: #38BDF8;" placeholder="请输入或生成密码">
         </div>
         <div class="form-group">
             <label class="form-label">备注说明</label>
@@ -467,20 +814,20 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Rotate Key -->
 <div id="rotateModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title">🔄 一键更换加密私钥</h3>
-        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">
-            服务端将使用原有私钥解密所有密码，并使用新私钥重新加密，保障数据绝对安全。
+        <h3 class="modal-title"><i class="fa-solid fa-arrows-rotate" style="color: #A855F7;"></i> 一键更换主加密私钥</h3>
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 18px;">
+            服务端将自动溯源历史密钥解密所有存量密码，并使用新私钥全量重新加密，保障绝对安全。
         </p>
         <div class="form-group">
-            <label class="form-label">当前旧私钥 (留空使用服务端当前私钥)</label>
-            <input type="text" id="rotOldKey" class="form-input" style="font-family: monospace;">
+            <label class="form-label">当前旧私钥 (留空使用服务端当前主私钥)</label>
+            <input type="text" id="rotOldKey" class="form-input" style="font-family: monospace; color: #38BDF8;">
         </div>
         <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label class="form-label" style="margin-bottom: 0;">新加密私钥 *</label>
-                <a href="javascript:void(0)" style="font-size: 12px; color: var(--primary); text-decoration: none;" onclick="genNewRotateKey()">生成随机私钥</a>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="form-label" style="margin-bottom: 0;">新加密主私钥 *</label>
+                <a href="javascript:void(0)" style="font-size: 12px; color: var(--accent-cyan); text-decoration: none;" onclick="genNewRotateKey()"><i class="fa-solid fa-wand-magic-sparkles"></i> 随机生成</a>
             </div>
-            <input type="text" id="rotNewKey" class="form-input" style="font-family: monospace;" placeholder="输入新的加密私钥">
+            <input type="text" id="rotNewKey" class="form-input" style="font-family: monospace; color: #38BDF8;" placeholder="输入新的加密主私钥">
         </div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('rotateModal')">取消</button>
@@ -492,14 +839,14 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <!-- Modal: Import -->
 <div id="importModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 class="modal-title">📥 导入私钥与密码记录</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-file-import" style="color: var(--accent-cyan);"></i> 导入私钥与密码记录</h3>
         <div class="form-group">
-            <label class="form-label">指定私钥 (可选，将更新服务端私钥)</label>
-            <input type="text" id="impKey" class="form-input" style="font-family: monospace;" placeholder="输入指定私钥">
+            <label class="form-label">指定主私钥 (可选，将更新服务端私钥)</label>
+            <input type="text" id="impKey" class="form-input" style="font-family: monospace; color: #38BDF8;" placeholder="输入指定私钥">
         </div>
         <div class="form-group">
             <label class="form-label">JSON 导入数据 *</label>
-            <textarea id="impJson" class="form-input" rows="6" style="font-family: monospace; font-size: 12px;" placeholder='{"private_key": "...", "records": [...] }'></textarea>
+            <textarea id="impJson" class="form-input" rows="6" style="font-family: monospace; font-size: 12px; color: #38BDF8;" placeholder='{"private_key": "...", "records": [...] }'></textarea>
         </div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('importModal')">取消</button>
@@ -509,6 +856,80 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 </div>
 
 <script>
+    // --- Starfield Particle Animation ---
+    const canvas = document.getElementById("starfield");
+    const ctx = canvas.getContext("2d");
+    let stars = [];
+    const STAR_COUNT = 160;
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", () => {
+        resizeCanvas();
+        initStars();
+    });
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < STAR_COUNT; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 1.5 + 0.5,
+                alpha: Math.random() * 0.8 + 0.2,
+                dx: (Math.random() - 0.5) * 0.2,
+                dy: (Math.random() - 0.5) * 0.2,
+                twinkleSpeed: Math.random() * 0.02 + 0.005
+            });
+        }
+    }
+
+    function animateStars() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(star => {
+            star.alpha += star.twinkleSpeed;
+            if (star.alpha > 1 || star.alpha < 0.2) star.twinkleSpeed = -star.twinkleSpeed;
+
+            star.x += star.dx;
+            star.y += star.dy;
+
+            if (star.x < 0) star.x = canvas.width;
+            if (star.x > canvas.width) star.x = 0;
+            if (star.y < 0) star.y = canvas.height;
+            if (star.y > canvas.height) star.y = 0;
+
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0.1, Math.min(1, star.alpha))})`;
+            ctx.shadowBlur = star.radius > 1.2 ? 6 : 0;
+            ctx.shadowColor = "#38BDF8";
+            ctx.fill();
+        });
+        requestAnimationFrame(animateStars);
+    }
+
+    resizeCanvas();
+    initStars();
+    animateStars();
+
+    // --- Toast Notifications ---
+    function showToast(msg, icon = "fa-circle-check") {
+        const container = document.getElementById("toastContainer");
+        const toast = document.createElement("div");
+        toast.className = "cosmic-toast";
+        toast.innerHTML = `<i class="fa-solid ${icon}" style="color: var(--accent-cyan);"></i> <span>${msg}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(20px)";
+            toast.style.transition = "all 0.3s";
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // --- State & API ---
     let authToken = localStorage.getItem("pwd_token") || "";
     let allRecords = [];
     let currentKey = "";
@@ -527,7 +948,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
         if (res.status === 429) {
             const errData = await res.json();
-            alert(errData.error || "请求过于频繁，请稍后再试");
+            showToast(errData.error || "请求过于频繁，请稍后再试", "fa-triangle-exclamation");
             throw new Error("Rate limited");
         }
         return await res.json();
@@ -541,6 +962,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             authToken = res.token;
             localStorage.setItem("pwd_token", authToken);
             document.getElementById("currentUserLabel").innerText = "用户: " + res.username;
+            showToast("登录成功，欢迎进入星空密码控制台！");
             initApp();
         } catch (e) {
             document.getElementById("loginMsg").innerText = "登录失败: " + e.message;
@@ -593,7 +1015,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         );
 
         if (filtered.length === 0) {
-            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-sub);">暂无密码记录</div>`;
+            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-sub);"><i class="fa-solid fa-satellite-dish" style="font-size: 32px; margin-bottom: 12px; color: rgba(255,255,255,0.2);"></i><div>暂无匹配的星空密码记录</div></div>`;
             return;
         }
 
@@ -613,23 +1035,23 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                 </div>
                 <div class="account-row">
-                    <span>账号: <strong>${escapeHtml(r.username || "(无)")}</strong></span>
-                    <a href="javascript:void(0)" onclick="copyText('${escapeJs(r.username)}')" style="color: var(--text-sub); text-decoration: none;"><i class="fa-regular fa-copy"></i> 复制</a>
+                    <span>账号: <strong style="color: #FFFFFF;">${escapeHtml(r.username || "(无)")}</strong></span>
+                    <a href="javascript:void(0)" onclick="copyText('${escapeJs(r.username)}', '账号')" style="color: var(--accent-cyan); text-decoration: none;"><i class="fa-regular fa-copy"></i> 复制</a>
                 </div>
                 <div class="pwd-field">
                     <span id="pwdText_${r.id}">${escapeHtml(plain)}</span>
                     <div>
-                        <button class="icon-btn" title="复制密码" onclick="copyText('${escapeJs(r.plain_password || "")}')"><i class="fa-solid fa-copy"></i></button>
+                        <button class="icon-btn" title="复制密码 (30秒自动清除)" onclick="copyText('${escapeJs(r.plain_password || "")}', '密码')"><i class="fa-solid fa-copy"></i></button>
                     </div>
                 </div>
-                ${r.notes ? `<div class="notes-row">备注: ${escapeHtml(r.notes)}</div>` : ""}
+                ${r.notes ? `<div class="notes-row"><i class="fa-regular fa-note-sticky"></i> 备注: ${escapeHtml(r.notes)}</div>` : ""}
             `;
             grid.appendChild(card);
         });
     }
 
     function showAddModal() {
-        document.getElementById("modalTitle").innerText = "添加新密码记录";
+        document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录`;
         document.getElementById("editId").value = "";
         document.getElementById("mName").value = "";
         document.getElementById("mUrl").value = "";
@@ -642,7 +1064,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function editPassword(id) {
         const item = allRecords.find(r => r.id === id);
         if (!item) return;
-        document.getElementById("modalTitle").innerText = "编辑密码记录";
+        document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-pen-to-square" style="color: var(--accent-cyan);"></i> 编辑密码记录`;
         document.getElementById("editId").value = item.id;
         document.getElementById("mName").value = item.name;
         document.getElementById("mUrl").value = item.url || "";
@@ -661,7 +1083,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         const notes = document.getElementById("mNotes").value.trim();
 
         if (!name || !password) {
-            alert("网站名称和密码不能为空！");
+            showToast("网站名称和密码不能为空！", "fa-triangle-exclamation");
             return;
         }
 
@@ -669,8 +1091,10 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (id) {
             payload.id = id;
             await api(`/api/passwords/${id}`, "PUT", payload);
+            showToast("密码记录更新并已重新加密！");
         } else {
             await api("/api/passwords", "POST", payload);
+            showToast("密码记录已由服务端 AES-256-GCM 安全加密！");
         }
 
         closeModal("pwdModal");
@@ -680,6 +1104,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     async function deletePassword(id, name) {
         if (confirm(`确定要删除「${name}」的记录吗？`)) {
             await api(`/api/passwords/${id}`, "DELETE");
+            showToast(`已删除「${name}」的记录`);
             await loadPasswords();
         }
     }
@@ -694,11 +1119,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         const old_key = document.getElementById("rotOldKey").value.trim();
         const new_key = document.getElementById("rotNewKey").value.trim();
         if (!new_key) {
-            alert("新私钥不能为空");
+            showToast("新私钥不能为空", "fa-triangle-exclamation");
             return;
         }
         const res = await api("/api/admin/rotate-key", "POST", { old_key, new_key, reencrypt_records: true });
-        alert(`密钥更换成功！已自动重新加密 ${res.reencrypted_records_count} 条记录。`);
+        showToast(`密钥更换成功！已自动重新加密 ${res.reencrypted_records_count} 条记录。`);
         closeModal("rotateModal");
         await loadKey();
         await loadPasswords();
@@ -712,6 +1137,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         a.href = url;
         a.download = `pwdmanager_export_${new Date().toISOString().slice(0,10)}.json`;
         a.click();
+        showToast("私钥与密码数据已安全导出！");
     }
 
     function showImportModal() {
@@ -724,14 +1150,14 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         const raw = document.getElementById("impJson").value.trim();
         const specKey = document.getElementById("impKey").value.trim();
         if (!raw) {
-            alert("请输入要导入的 JSON 数据");
+            showToast("请输入要导入的 JSON 数据", "fa-triangle-exclamation");
             return;
         }
         let parsed;
         try {
             parsed = JSON.parse(raw);
         } catch (e) {
-            alert("JSON 格式不正确");
+            showToast("JSON 格式不正确", "fa-triangle-exclamation");
             return;
         }
 
@@ -741,7 +1167,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         };
 
         const res = await api("/api/admin/import", "POST", payload);
-        alert(`导入成功！共导入 ${res.imported_records_count} 条记录。`);
+        showToast(`导入成功！共导入 ${res.imported_records_count} 条记录。`);
         closeModal("importModal");
         await loadKey();
         await loadPasswords();
@@ -758,30 +1184,31 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
     function genNewRotateKey() {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+~";
-        let str = "Key_";
+        let str = "Cosmic_";
         for (let i = 0; i < 24; i++) {
             str += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         document.getElementById("rotNewKey").value = str;
     }
 
-    function copyText(text) {
+    function copyText(text, label = "内容") {
         if (!text) return;
-        navigator.clipboard.writeText(text).then(() => alert("已复制到剪贴板"));
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`${label}已复制到剪贴板！`);
+        });
     }
 
     function openModal(id) { document.getElementById(id).style.display = "flex"; }
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
     function escapeHtml(s) { return (s||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-    function escapeJs(s) { return (s||'').replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+    function escapeJs(s) { return (s||'').replace(/\/g, "\\").replace(/'/g, "\'"); }
 
     if (authToken) {
         initApp();
     }
 </script>
 </body>
-</html>
-"""
+</html>"""
 
 class RequestHandler(BaseHTTPRequestHandler):
     def _send_security_headers(self):
