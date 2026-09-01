@@ -88,7 +88,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     raw_plain_pwd = "MySuperSecretBankPass!2026#"
     payload = {
         "id": test_id,
-        "name": "Industrial Bank",
+        "name": f"Industrial Bank ({test_id})",
         "url": "https://www.cib.com.cn",
         "username": "admin_cib",
         "password": raw_plain_pwd,
@@ -203,11 +203,47 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     new_headers = {"Authorization": f"Bearer {res_new_login['token']}"}
 
     # (d) Restore default password for consistency
-    status, _, _ = request_raw(f"{base_url}/api/auth/change-password", "POST",
+    status, _, res_restore = request_raw(f"{base_url}/api/auth/change-password", "POST",
                                {"old_password": "NewSecretPass@2026!", "new_password": "admin@1234"},
                                headers=new_headers)
     assert status == 200, "Failed to restore password"
+    # Re-authenticate to refresh auth_headers with fresh token
+    status, _, relogin_data = request_raw(f"{base_url}/api/auth/login", "POST", {"username": "jason", "password": "admin@1234"})
+    assert status == 200
+    auth_headers = {"Authorization": f"Bearer {relogin_data['token']}"}
     print("  [PASS] 12. POST /api/auth/change-password (Admin password change, validation & verification passed)")
+
+    # 13. Test Duplicate Prevention on Create and Edit
+    dupe_name = f"Cloudflare CDN ({test_id})"
+    dupe_url = "https://dash.cloudflare.com"
+    dupe_user = "sec_admin"
+
+    # (a) Create first entry
+    status, _, res1 = request_raw(f"{base_url}/api/passwords", "POST",
+                                  {"name": dupe_name, "url": dupe_url, "username": dupe_user, "password": "Pass1#Cloudflare"},
+                                  headers=auth_headers)
+    assert status == 201
+    entry1_id = res1["id"]
+
+    # (b) Attempting to create duplicate entry with identical name, url, username -> must be rejected with 409
+    status, _, res_dupe = request_raw(f"{base_url}/api/passwords", "POST",
+                                       {"name": f"  {dupe_name}  ", "url": dupe_url, "username": dupe_user, "password": "Pass2#Duplicate"},
+                                       headers=auth_headers)
+    assert status == 409, f"Expected 409 for duplicate password entry, got {status}: {res_dupe}"
+
+    # (c) Create another distinct entry
+    status, _, res2 = request_raw(f"{base_url}/api/passwords", "POST",
+                                  {"name": f"Vercel ({test_id})", "url": "https://vercel.com", "username": "vercel_user", "password": "Pass#Vercel"},
+                                  headers=auth_headers)
+    assert status == 201
+    entry2_id = res2["id"]
+
+    # (d) Attempting to update entry2 to collide with entry1 -> must be rejected with 409
+    status, _, res_edit_dupe = request_raw(f"{base_url}/api/passwords/{entry2_id}", "PUT",
+                                           {"name": dupe_name, "url": dupe_url, "username": dupe_user},
+                                           headers=auth_headers)
+    assert status == 409, f"Expected 409 for editing into duplicate entry, got {status}: {res_edit_dupe}"
+    print("  [PASS] 13. POST/PUT /api/passwords (Duplicate prevention validated: 409 Conflict on create & edit)")
 
     print("\n==========================================================================================")
     print(">>> ALL SECURITY HARDENING, WEB HEADERS, AUTH & CRYPTO TESTS PASSED! <<<")

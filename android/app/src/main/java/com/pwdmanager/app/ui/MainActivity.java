@@ -189,6 +189,14 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 return;
             }
 
+            // Duplicate validation (Disallow duplicate website name, url and username)
+            String excludeId = isEdit && existingItem != null ? existingItem.getId() : null;
+            if (dbHelper.existsDuplicate(excludeId, name, url, username)) {
+                Toast.makeText(MainActivity.this, "已存在相同的网站名称、网址与账号，不允许重复添加！", Toast.LENGTH_LONG).show();
+                etName.setError("已存在完全相同的记录");
+                return;
+            }
+
             try {
                 PasswordItem item = isEdit ? existingItem : new PasswordItem();
                 item.setName(name);

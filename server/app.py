@@ -970,6 +970,10 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             doLogout();
             throw new Error("认证失败或已过期，请重新登录");
         }
+        if (res.status === 409 || res.status === 400) {
+            const errData = await res.json();
+            throw new Error(errData.error || "请求失败");
+        }
         if (res.status === 429) {
             const errData = await res.json();
             showToast(errData.error || "请求过于频繁，请稍后再试", "fa-triangle-exclamation");
@@ -1788,6 +1792,20 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             conn = get_db_connection()
             cursor = conn.cursor()
+
+            # Disallow duplicate name, url, username combination
+            cursor.execute("""
+                SELECT id FROM password_entries
+                WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+                  AND LOWER(TRIM(COALESCE(url, ''))) = LOWER(TRIM(?))
+                  AND LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM(?))
+                  AND is_deleted = 0 AND id != ?
+            """, (name, url, username, entry_id))
+            if cursor.fetchone():
+                conn.close()
+                self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许重复添加！"})
+                return
+
             cursor.execute("""
                 INSERT INTO password_entries (
                     id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted
@@ -1919,6 +1937,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             encrypted_password = body.get('encrypted_password', existing['encrypted_password'])
             iv = body.get('iv', existing['iv'])
             salt = body.get('salt', existing['salt'])
+
+        # Disallow duplicate name, url, username combination on edit
+        cursor.execute("""
+            SELECT id FROM password_entries
+            WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+              AND LOWER(TRIM(COALESCE(url, ''))) = LOWER(TRIM(?))
+              AND LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM(?))
+              AND is_deleted = 0 AND id != ?
+        """, (name, url, username, entry_id))
+        if cursor.fetchone():
+            conn.close()
+            self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许修改为重复项！"})
+            return
 
         cursor.execute("""
             UPDATE password_entries SET

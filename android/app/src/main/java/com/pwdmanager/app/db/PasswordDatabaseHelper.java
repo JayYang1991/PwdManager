@@ -120,6 +120,37 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         return list;
     }
 
+    public synchronized boolean existsDuplicate(String excludeId, String name, String url, String username) {
+        if (name == null) return false;
+        SQLiteDatabase db = getReadableDatabase();
+        String n = name.trim();
+        String u = url != null ? url.trim() : "";
+        String un = username != null ? username.trim() : "";
+
+        String selection = "LOWER(TRIM(" + COLUMN_NAME + ")) = LOWER(?) " +
+                "AND LOWER(TRIM(COALESCE(" + COLUMN_URL + ", ''))) = LOWER(?) " +
+                "AND LOWER(TRIM(COALESCE(" + COLUMN_USERNAME + ", ''))) = LOWER(?) " +
+                "AND " + COLUMN_IS_DELETED + " = 0";
+
+        List<String> argsList = new ArrayList<>();
+        argsList.add(n);
+        argsList.add(u);
+        argsList.add(un);
+
+        if (excludeId != null && !excludeId.trim().isEmpty()) {
+            selection += " AND " + COLUMN_ID + " != ?";
+            argsList.add(excludeId.trim());
+        }
+
+        Cursor cursor = db.query(TABLE_PASSWORDS, new String[]{COLUMN_ID}, selection, argsList.toArray(new String[0]), null, null, null);
+        boolean exists = false;
+        if (cursor != null) {
+            exists = cursor.moveToFirst();
+            cursor.close();
+        }
+        return exists;
+    }
+
     public synchronized PasswordItem getPasswordById(String id) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.query(TABLE_PASSWORDS, null, COLUMN_ID + " = ?", new String[]{id}, null, null, null);
