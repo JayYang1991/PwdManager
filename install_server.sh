@@ -50,8 +50,12 @@ LOCAL_TAR=""
 
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/pwdmanager-server.tar.gz" ]; then
     LOCAL_TAR="$SCRIPT_DIR/pwdmanager-server.tar.gz"
+elif [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/dist/pwdmanager-server.tar.gz" ]; then
+    LOCAL_TAR="$SCRIPT_DIR/dist/pwdmanager-server.tar.gz"
 elif [ -f "./pwdmanager-server.tar.gz" ]; then
     LOCAL_TAR="./pwdmanager-server.tar.gz"
+elif [ -f "./dist/pwdmanager-server.tar.gz" ]; then
+    LOCAL_TAR="./dist/pwdmanager-server.tar.gz"
 fi
 
 if [ -n "$LOCAL_TAR" ]; then
@@ -68,7 +72,7 @@ else
         mkdir -p "$TEMP_DIR/pwdmanager-server/download"
         curl -fsSL -o "$TEMP_DIR/pwdmanager-server/app.py" "${RAW_BASE_URL}/server/app.py"
         curl -fsSL -o "$TEMP_DIR/pwdmanager-server/install.sh" "${RAW_BASE_URL}/server/install.sh"
-        curl -fsSL -o "$TEMP_DIR/pwdmanager-server/download/PwdManager.apk" "${RAW_BASE_URL}/dist/PwdManager.apk" 2>/dev/null || true
+        curl -fL --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server/download/PwdManager.apk" "https://github.com/${GITHUB_REPO}/releases/latest/download/PwdManager.apk" 2>/dev/null || true
     fi
 fi
 
@@ -76,4 +80,3 @@ fi
 cd "$TEMP_DIR/pwdmanager-server"
 chmod +x install.sh app.py
 $SUDO bash install.sh
-

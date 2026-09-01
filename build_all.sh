@@ -136,6 +136,7 @@ echo "  ✅ 服务端安装包打包完成: $SERVER_TAR ($(du -h "$SERVER_TAR" |
 # ------------------------------------------------------------------------------
 echo ""
 echo "[3/4] 准备独立一键安装脚本 (dist/install_server.sh)..."
+cp "$PROJECT_ROOT/install_server.sh" "$DIST_DIR/install_server.sh"
 chmod +x "$DIST_DIR/install_server.sh"
 echo "  ✅ 独立安装脚本就绪: $DIST_DIR/install_server.sh"
 
@@ -176,7 +177,7 @@ if [ "$DO_RELEASE" = true ]; then
 #### 📦 下载与安装：
 - **服务端一键极速安装 (Linux)**：
   \`\`\`bash
-  curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist/install_server.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/install_server.sh | sudo bash
   \`\`\`
 - **安卓客户端 (APK) 下载**：[PwdManager.apk](https://github.com/${GITHUB_REPO}/releases/download/${TAG_NAME}/PwdManager.apk)"
 
