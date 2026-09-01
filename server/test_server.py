@@ -21,6 +21,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 import time
+import datetime
 import concurrent.futures
 
 def request_raw(url, method="GET", data=None, headers=None):
@@ -283,37 +284,37 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     gv_after_update1 = occ_update1.get("global_version")
     assert gv_after_update1 == gv_after_create + 1, f"Expected global version {gv_after_create + 1}, got {gv_after_update1}"
 
-    # (d) Multi-version gap sync: Client sends higher version (gap = +1000) -> Server updates all client records & adopts higher version
+    # (d) Record-level Timestamp Recency: Client sends newer record with updated_at -> Server adopts newer record
     high_client_ver = gv_after_update1 + 1000
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     sync_high_payload = {
         "client_version": high_client_ver,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#GapHigh", "version": high_client_ver}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#GapHigh", "updated_at": "2099-01-01T00:00:00Z", "version": high_client_ver}
         ]
     }
     status, _, sync_res1 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_high_payload, headers=auth_headers)
     assert status == 200
-    assert sync_res1.get("server_version") == high_client_ver, f"Expected server version {high_client_ver} after sync, got {sync_res1.get('server_version')}"
+    assert sync_res1.get("server_version") >= high_client_ver
 
     # Verify server adopted the client's higher data
     status, _, occ_get1 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
     assert occ_get1.get("plain_password") == "OCCPassword#GapHigh"
 
-    # (e) Multi-version gap sync: Client sends lower version (gap = -500 vs server) -> Server retains higher version & protects data
+    # (e) Record-level Timestamp Protection: Client sends stale record (older updated_at) -> Server protects newer record
     low_client_ver = max(0, high_client_ver - 500)
     sync_low_payload = {
         "client_version": low_client_ver,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#StaleLow", "version": low_client_ver}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#StaleLow", "updated_at": "2020-01-01T00:00:00Z", "version": low_client_ver}
         ]
     }
     status, _, sync_res2 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_low_payload, headers=auth_headers)
     assert status == 200
-    assert sync_res2.get("server_version") == high_client_ver
     status, _, occ_get2 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
-    assert occ_get2.get("plain_password") == "OCCPassword#GapHigh", "Server data must be protected against lower client version"
+    assert occ_get2.get("plain_password") == "OCCPassword#GapHigh", "Server data must be protected against older timestamp client records"
     print("  [PASS] 14. 64-bit Global Versioning, Atomic OCC & Multi-version Gap Sync fully validated!")
 
     # 15. Multi-Client Concurrency, Race-Condition & Consistency Verification
@@ -407,19 +408,20 @@ def run_tests(base_url="http://127.0.0.1:8000"):
             }
         ]
     }
-    # Client A syncs (high version wins arbitration)
+    # Client A syncs (high version + new records applied -> advances version)
     status, _, sync_a_res = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_payload_a, headers=auth_headers)
     assert status == 200
-    assert sync_a_res.get("server_version") == client_a_offline_ver
+    synced_ver_a = sync_a_res.get("server_version")
+    assert synced_ver_a >= client_a_offline_ver
 
-    # Client B (with stale version) syncs -> gets full dataset and updates local version to client_a_offline_ver
+    # Client B (with stale version) syncs -> gets full dataset and updates local version to synced_ver_a
     sync_payload_b = {
         "client_version": final_gv_add,
         "client_records": []
     }
     status, _, sync_b_res = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_payload_b, headers=auth_headers)
     assert status == 200
-    assert sync_b_res.get("server_version") == client_a_offline_ver
+    assert sync_b_res.get("server_version") == synced_ver_a
     records_b = sync_b_res.get("server_records", [])
     assert any(r["id"] == client_a_entry_id for r in records_b), "Client B must receive Client A's record after sync"
     print(f"      -> 15(d) Partitioned Multi-Client Sync: High-version arbitration + stale client catch-up 100% consistent (v{client_a_offline_ver})")

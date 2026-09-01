@@ -2012,33 +2012,30 @@ class RequestHandler(BaseHTTPRequestHandler):
                     applied_count += 1
                 else:
                     # Existing record present on both:
-                    # 1. If client global version is higher -> client wins
-                    # 2. If equal -> newer updated_at wins
-                    # 3. If server global version is higher -> server keeps its record
-                    if client_version > server_version:
+                    # Fine-grained LWW (Last-Write-Wins based on record's updated_at timestamp)
+                    # A record's freshness is uniquely determined by its own modification timestamp,
+                    # ensuring that modifications to different records across different clients merge without loss.
+                    if r_updated_at > existing['updated_at']:
                         cursor.execute("""
                             UPDATE password_entries SET
                                 name = ?, url = ?, username = ?, encrypted_password = ?,
                                 iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
                                 version = ?
                             WHERE id = ?
-                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, client_version, r_id))
+                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, max(client_version, server_version), r_id))
                         applied_count += 1
-                    elif client_version == server_version:
-                        if r_updated_at > existing['updated_at']:
-                            cursor.execute("""
-                                UPDATE password_entries SET
-                                    name = ?, url = ?, username = ?, encrypted_password = ?,
-                                    iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?
-                                WHERE id = ?
-                            """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_id))
-                            applied_count += 1
 
-            if client_version > server_version:
-                set_global_version(client_version, conn)
-                server_version = client_version
-            elif applied_count > 0:
-                success, server_version = increment_global_version(conn)
+            # Global Version Convergence:
+            # The new unified global version is at least max(client_version, server_version),
+            # incremented if new changes were applied to server in this sync transaction.
+            base_target_ver = max(client_version, server_version)
+            if applied_count > 0:
+                final_version = base_target_ver + 1
+            else:
+                final_version = base_target_ver
+
+            set_global_version(final_version, conn)
+            server_version = final_version
 
             conn.commit()
 
