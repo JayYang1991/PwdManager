@@ -74,7 +74,15 @@ mkdir -p "$DIST_DIR" "$PROJECT_ROOT/server/download"
 echo ""
 echo "[1/4] 编译 Android APP (Gradle assembleDebug)..."
 cd "$PROJECT_ROOT/android"
-gradle assembleDebug
+if [ -f "./gradlew" ]; then
+    chmod +x ./gradlew
+    ./gradlew assembleDebug
+elif command -v gradle &> /dev/null; then
+    gradle assembleDebug
+else
+    echo "❌ 错误: 未找到 gradlew 或 gradle 命令"
+    exit 1
+fi
 
 APK_SRC="$PROJECT_ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 if [ ! -f "$APK_SRC" ]; then
