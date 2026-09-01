@@ -12,9 +12,11 @@ import java.util.List;
 public class PasswordDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "pwdmanager_local.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     public static final String TABLE_PASSWORDS = "passwords";
+    public static final String TABLE_META = "meta_config";
+
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_NAME = "name";
     public static final String COLUMN_URL = "url";
@@ -25,6 +27,10 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_UPDATED_AT = "updated_at";
     public static final String COLUMN_IS_DELETED = "is_deleted";
     public static final String COLUMN_VERSION = "version";
+
+    public static final String META_KEY = "key";
+    public static final String META_VALUE = "value";
+    public static final String KEY_GLOBAL_VERSION = "global_version";
 
     private static PasswordDatabaseHelper instance;
 
@@ -54,15 +60,62 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_VERSION + " INTEGER DEFAULT 0)";
         db.execSQL(createTable);
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_pwd_updated_at ON " + TABLE_PASSWORDS + " (" + COLUMN_UPDATED_AT + ")");
+
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_META + " (" +
+                META_KEY + " TEXT PRIMARY KEY, " +
+                META_VALUE + " TEXT NOT NULL)");
+        ContentValues cv = new ContentValues();
+        cv.put(META_KEY, KEY_GLOBAL_VERSION);
+        cv.put(META_VALUE, "0");
+        db.insertWithOnConflict(TABLE_META, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_META + " (" +
+                META_KEY + " TEXT PRIMARY KEY, " +
+                META_VALUE + " TEXT NOT NULL)");
+        ContentValues cv = new ContentValues();
+        cv.put(META_KEY, KEY_GLOBAL_VERSION);
+        cv.put(META_VALUE, "0");
+        db.insertWithOnConflict(TABLE_META, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
+
         if (oldVersion < 3) {
             try {
                 db.execSQL("ALTER TABLE " + TABLE_PASSWORDS + " ADD COLUMN " + COLUMN_VERSION + " INTEGER DEFAULT 0");
             } catch (Exception ignored) {}
         }
+    }
+
+    public synchronized long getGlobalVersion() {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(TABLE_META, new String[]{META_VALUE}, META_KEY + " = ?", new String[]{KEY_GLOBAL_VERSION}, null, null, null);
+        long version = 0L;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                try {
+                    version = Long.parseLong(cursor.getString(0));
+                } catch (Exception e) {
+                    version = 0L;
+                }
+            }
+            cursor.close();
+        }
+        return version;
+    }
+
+    public synchronized void setGlobalVersion(long version) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(META_KEY, KEY_GLOBAL_VERSION);
+        cv.put(META_VALUE, String.valueOf(Math.max(version, 0L)));
+        db.insertWithOnConflict(TABLE_META, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized long incrementGlobalVersion() {
+        long next = getGlobalVersion() + 1;
+        setGlobalVersion(next);
+        return next;
     }
 
     public synchronized void upsertPassword(PasswordItem item) {
@@ -84,12 +137,9 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
 
     public synchronized void softDeletePassword(String id) {
         SQLiteDatabase db = getWritableDatabase();
-        PasswordItem existing = getPasswordById(id);
-        int newVersion = (existing != null ? existing.getVersion() + 1 : 1);
         ContentValues values = new ContentValues();
         values.put(COLUMN_IS_DELETED, 1);
         values.put(COLUMN_UPDATED_AT, PasswordItem.getIsoNow());
-        values.put(COLUMN_VERSION, newVersion);
         db.update(TABLE_PASSWORDS, values, COLUMN_ID + " = ?", new String[]{id});
     }
 

@@ -239,24 +239,31 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     entry2_id = res2["id"]
 
     # (d) Attempting to update entry2 to collide with entry1 -> must be rejected with 409
+    # Get current global version
+    _, _, cur_pwds = request_raw(f"{base_url}/api/passwords", "GET", headers=auth_headers)
+    cur_gv = cur_pwds.get("global_version", 0)
     status, _, res_edit_dupe = request_raw(f"{base_url}/api/passwords/{entry2_id}", "PUT",
-                                           {"name": dupe_name, "url": dupe_url, "username": dupe_user, "version": res2.get("version", 1)},
+                                           {"name": dupe_name, "url": dupe_url, "username": dupe_user, "version": cur_gv},
                                            headers=auth_headers)
     assert status == 409, f"Expected 409 for editing into duplicate entry, got {status}: {res_edit_dupe}"
     print("  [PASS] 13. POST/PUT /api/passwords (Duplicate prevention validated: 409 Conflict on create & edit)")
 
-    # 14. Test Optimistic Concurrency Control (OCC) & Versioning Mechanism
-    occ_name = f"OCC Vault Test ({test_id})"
+    # 14. Test 64-bit Global Versioning, Atomic OCC & Arbitrary-Gap Sync
+    _, _, pwds_init = request_raw(f"{base_url}/api/passwords", "GET", headers=auth_headers)
+    gv_start = pwds_init.get("global_version", 0)
+
+    occ_name = f"OCC Global Vault Test ({test_id})"
     status, _, occ_create = request_raw(f"{base_url}/api/passwords", "POST",
                                         {"name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#1"},
                                         headers=auth_headers)
     assert status == 201
     occ_id = occ_create["id"]
-    assert occ_create.get("version") == 0, f"Expected initial version 0, got {occ_create.get('version')}"
+    gv_after_create = occ_create.get("global_version")
+    assert gv_after_create == gv_start + 1, f"Expected global version {gv_start + 1}, got {gv_after_create}"
 
-    # (a) Mismatching version -> must return 409 Conflict with VERSION_MISMATCH
+    # (a) Mismatching global version -> must return 409 Conflict with VERSION_MISMATCH
     status, _, occ_mismatch = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
-                                          {"name": occ_name, "password": "OCCPassword#BadVer", "version": 99},
+                                          {"name": occ_name, "password": "OCCPassword#BadVer", "version": 999999},
                                           headers=auth_headers)
     assert status == 409, f"Expected 409 Conflict for version mismatch, got {status}: {occ_mismatch}"
     assert occ_mismatch.get("code") == "VERSION_MISMATCH"
@@ -267,47 +274,44 @@ def run_tests(base_url="http://127.0.0.1:8000"):
                                         headers=auth_headers)
     assert status == 400, f"Expected 400 Bad Request for missing version, got {status}: {occ_no_ver}"
 
-    # (c) Correct version 0 -> atomic update, version incremented to 1
+    # (c) Correct global version -> atomic update, global version incremented
     status, _, occ_update1 = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
-                                         {"name": occ_name, "password": "OCCPassword#2", "version": 0},
+                                         {"name": occ_name, "password": "OCCPassword#2", "version": gv_after_create},
                                          headers=auth_headers)
     assert status == 200, f"Expected 200 for valid version update, got {status}: {occ_update1}"
-    assert occ_update1.get("version") == 1, f"Expected version 1 after first update, got {occ_update1.get('version')}"
+    gv_after_update1 = occ_update1.get("global_version")
+    assert gv_after_update1 == gv_after_create + 1, f"Expected global version {gv_after_create + 1}, got {gv_after_update1}"
 
-    # (d) Second atomic update with version 1 -> version incremented to 2
-    status, _, occ_update2 = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
-                                         {"name": occ_name, "password": "OCCPassword#3", "version": 1},
-                                         headers=auth_headers)
-    assert status == 200
-    assert occ_update2.get("version") == 2, f"Expected version 2 after second update, got {occ_update2.get('version')}"
-
-    # (e) Sync Arbitration: Client sends higher version (v10) -> server adopts v10
+    # (d) Multi-version gap sync: Client sends higher version (v1000, gap = +900) -> Server updates all client records & adopts v1000
     sync_high_payload = {
+        "client_version": 1000,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#HighVer", "version": 10}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#Gap1000", "version": 1000}
         ]
     }
     status, _, sync_res1 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_high_payload, headers=auth_headers)
     assert status == 200
-    # Verify server adopted v10
+    assert sync_res1.get("server_version") == 1000, f"Expected server version 1000 after sync, got {sync_res1.get('server_version')}"
+
+    # Verify server adopted the client's higher data
     status, _, occ_get1 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
-    assert occ_get1.get("version") == 10, f"Expected server to adopt client high version 10, got {occ_get1.get('version')}"
-    assert occ_get1.get("plain_password") == "OCCPassword#HighVer"
+    assert occ_get1.get("plain_password") == "OCCPassword#Gap1000"
 
-    # (f) Sync Arbitration: Client sends lower version (v5 vs server v10) -> server retains v10
+    # (e) Multi-version gap sync: Client sends lower version (v50, gap = -950 vs server v1000) -> Server retains v1000 & protects data
     sync_low_payload = {
+        "client_version": 50,
         "client_records": [
-            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#LowVer", "version": 5}
+            {"id": occ_id, "name": occ_name, "url": "https://vault.internal", "username": "occ_admin", "password": "OCCPassword#Stale50", "version": 50}
         ]
     }
     status, _, sync_res2 = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_low_payload, headers=auth_headers)
     assert status == 200
+    assert sync_res2.get("server_version") == 1000
     status, _, occ_get2 = request_raw(f"{base_url}/api/passwords/{occ_id}?decrypt=1", "GET", headers=auth_headers)
     assert status == 200
-    assert occ_get2.get("version") == 10, f"Expected server to retain v10 over client v5, got {occ_get2.get('version')}"
-    assert occ_get2.get("plain_password") == "OCCPassword#HighVer"
-    print("  [PASS] 14. Optimistic Concurrency Control (OCC) & Versioning validated: atomic increment + mismatch rejection + sync high version priority")
+    assert occ_get2.get("plain_password") == "OCCPassword#Gap1000", "Server data must be protected against lower client version"
+    print("  [PASS] 14. 64-bit Global Versioning, Atomic OCC & Multi-version Gap Sync fully validated!")
 
     print("\n==========================================================================================")
     print(">>> ALL SECURITY HARDENING, WEB HEADERS, AUTH & CRYPTO TESTS PASSED! <<<")

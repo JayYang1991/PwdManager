@@ -217,6 +217,10 @@ def init_db():
         )
     """)
     cursor.execute("""
+        INSERT OR IGNORE INTO server_config (key, value, updated_at)
+        VALUES ('global_version', '0', ?)
+    """, (get_iso_now(),))
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS key_history (
             key TEXT PRIMARY KEY,
             created_at TEXT NOT NULL
@@ -237,6 +241,73 @@ def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_global_version(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_db_connection()
+        close_conn = True
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM server_config WHERE key = 'global_version'")
+    row = cursor.fetchone()
+    if not row:
+        now = get_iso_now()
+        cursor.execute("INSERT OR IGNORE INTO server_config (key, value, updated_at) VALUES ('global_version', '0', ?)", (now,))
+        conn.commit()
+        ver = 0
+    else:
+        try:
+            ver = int(row['value'])
+        except Exception:
+            ver = 0
+    if close_conn:
+        conn.close()
+    return ver
+
+def set_global_version(ver, conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_db_connection()
+        close_conn = True
+    cursor = conn.cursor()
+    now = get_iso_now()
+    cursor.execute("""
+        INSERT INTO server_config (key, value, updated_at) VALUES ('global_version', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    """, (str(int(ver)), now))
+    if close_conn:
+        conn.commit()
+        conn.close()
+    return int(ver)
+
+def increment_global_version(conn, expected_ver=None):
+    cursor = conn.cursor()
+    now = get_iso_now()
+    if expected_ver is not None:
+        cursor.execute("""
+            UPDATE server_config
+            SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT), updated_at = ?
+            WHERE key = 'global_version' AND CAST(value AS INTEGER) = ?
+        """, (now, int(expected_ver)))
+        if cursor.rowcount == 0:
+            cursor.execute("SELECT value FROM server_config WHERE key = 'global_version'")
+            row = cursor.fetchone()
+            current_ver = int(row['value']) if row else 0
+            return False, current_ver
+        cursor.execute("SELECT value FROM server_config WHERE key = 'global_version'")
+        new_ver = int(cursor.fetchone()['value'])
+        return True, new_ver
+    else:
+        cursor.execute("""
+            INSERT INTO server_config (key, value, updated_at) VALUES ('global_version', '1', ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = CAST(CAST(value AS INTEGER) + 1 AS TEXT),
+                updated_at = excluded.updated_at
+        """, (now,))
+        cursor.execute("SELECT value FROM server_config WHERE key = 'global_version'")
+        new_ver = int(cursor.fetchone()['value'])
+        return True, new_ver
 
 def get_current_private_key():
     # Prefer environment variable if configured
@@ -964,6 +1035,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     // --- State & API ---
     let authToken = localStorage.getItem("pwd_token") || "";
     let allRecords = [];
+    let currentGlobalVersion = 0;
     let currentKey = "";
 
     async function api(path, method = "GET", data = null) {
@@ -1125,8 +1197,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
 
-        const version = parseInt(document.getElementById("mVersion").value) >= 0 ? parseInt(document.getElementById("mVersion").value) : 0;
-        const payload = { name, url, username, password, notes, version };
+        const payload = { name, url, username, password, notes, version: currentGlobalVersion };
         if (id) {
             payload.id = id;
             await api(`/api/passwords/${id}`, "PUT", payload);
@@ -1502,7 +1573,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                         current_key
                     )
 
-            self._send_json(200, {"count": len(rows), "records": rows})
+            gv = get_global_version()
+            self._send_json(200, {"count": len(rows), "global_version": gv, "records": rows})
             return
 
         # Single Password Reveal
@@ -1819,7 +1891,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许重复添加！"})
                 return
 
-            version = int(body.get('version', 0))
+            # Increment global version atomically
+            success, new_gv = increment_global_version(conn)
             cursor.execute("""
                 INSERT INTO password_entries (
                     id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
@@ -1829,26 +1902,29 @@ class RequestHandler(BaseHTTPRequestHandler):
                     encrypted_password=excluded.encrypted_password, iv=excluded.iv, salt=excluded.salt,
                     notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted,
                     version=excluded.version
-            """, (entry_id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version))
+            """, (entry_id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, new_gv))
             conn.commit()
 
             cursor.execute("SELECT * FROM password_entries WHERE id = ?", (entry_id,))
             saved = dict(cursor.fetchone())
+            saved["global_version"] = new_gv
             conn.close()
 
             self._send_json(201, saved)
             return
 
-        # 5. Two-Way Sync
+        # 5. Two-Way Sync (Global 64-bit Version Arbitration across arbitrary gaps)
         if path == '/api/passwords/sync':
-            last_sync_time = body.get('last_sync_time')
+            client_version = int(body.get('client_version', body.get('global_version', body.get('version', 0))))
             client_records = body.get('client_records', [])
             current_key = get_current_private_key()
 
             conn = get_db_connection()
             cursor = conn.cursor()
+            server_version = get_global_version(conn)
 
             applied_count = 0
+
             for record in client_records:
                 r_id = record.get('id')
                 if not r_id:
@@ -1869,30 +1945,32 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = record.get('iv', '')
                     r_salt = record.get('salt', '')
 
-                r_version = int(record.get('version', 0))
-                cursor.execute("SELECT version, updated_at FROM password_entries WHERE id = ?", (r_id,))
+                cursor.execute("SELECT updated_at FROM password_entries WHERE id = ?", (r_id,))
                 existing = cursor.fetchone()
 
                 if not existing:
+                    # Brand new record on client -> always accept and insert
                     cursor.execute("""
                         INSERT INTO password_entries (
                             id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, r_version))
+                    """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, max(client_version, server_version)))
                     applied_count += 1
                 else:
-                    server_version = int(existing['version'])
-                    # Data with higher version prevails (高版本号优先)
-                    if r_version > server_version:
+                    # Existing record present on both:
+                    # 1. If client global version is higher -> client wins
+                    # 2. If equal -> newer updated_at wins
+                    # 3. If server global version is higher -> server keeps its record
+                    if client_version > server_version:
                         cursor.execute("""
                             UPDATE password_entries SET
                                 name = ?, url = ?, username = ?, encrypted_password = ?,
                                 iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
                                 version = ?
                             WHERE id = ?
-                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_version, r_id))
+                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, client_version, r_id))
                         applied_count += 1
-                    elif r_version == server_version:
+                    elif client_version == server_version:
                         if r_updated_at > existing['updated_at']:
                             cursor.execute("""
                                 UPDATE password_entries SET
@@ -1902,12 +1980,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                             """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_id))
                             applied_count += 1
 
+            if client_version > server_version:
+                set_global_version(client_version, conn)
+                server_version = client_version
+            elif applied_count > 0:
+                success, server_version = increment_global_version(conn)
+
             conn.commit()
 
-            if last_sync_time:
-                cursor.execute("SELECT * FROM password_entries WHERE updated_at > ?", (last_sync_time,))
-            else:
-                cursor.execute("SELECT * FROM password_entries")
+            cursor.execute("SELECT * FROM password_entries")
             server_records = [dict(r) for r in cursor.fetchall()]
             conn.close()
 
@@ -1916,6 +1997,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             self._send_json(200, {
                 "server_time": get_iso_now(),
+                "server_version": server_version,
+                "global_version": server_version,
                 "applied_from_client": applied_count,
                 "server_records": server_records
             })
@@ -1986,44 +2069,49 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         if 'version' not in body:
             conn.close()
-            self._send_json(400, {"error": "修改记录密码接口需要传入当前版本号 (version)", "code": "VERSION_REQUIRED"})
+            self._send_json(400, {"error": "修改记录密码接口需要传入当前全局版本号 (version)", "code": "VERSION_REQUIRED"})
             return
 
         client_version = int(body.get('version', 0))
-        server_version = int(existing['version'])
+        server_global_version = get_global_version(conn)
 
-        if client_version != server_version:
+        if client_version != server_global_version:
             conn.close()
             self._send_json(409, {
-                "error": f"版本冲突：服务端当前版本为 v{server_version}，接口传入版本为 v{client_version}，拒绝修改！",
+                "error": f"版本冲突：服务端当前全局版本为 v{server_global_version}，接口传入版本为 v{client_version}，拒绝修改！",
                 "code": "VERSION_MISMATCH",
-                "server_version": server_version,
+                "server_version": server_global_version,
+                "global_version": server_global_version,
                 "client_version": client_version
             })
             return
 
-        # Atomic update & increment version (原子操作更新版本号)
+        # Atomic OCC: Increment global version
+        success, new_gv = increment_global_version(conn, expected_ver=client_version)
+        if not success:
+            conn.rollback()
+            conn.close()
+            self._send_json(409, {
+                "error": "并发修改冲突：服务端全局版本在更新过程中已变更，请刷新重试！",
+                "code": "CONCURRENT_CONFLICT",
+                "server_version": new_gv,
+                "global_version": new_gv
+            })
+            return
+
         cursor.execute("""
             UPDATE password_entries SET
                 name = ?, url = ?, username = ?, encrypted_password = ?,
                 iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
-                version = version + 1
-            WHERE id = ? AND version = ?
-        """, (name, url, username, encrypted_password, iv, salt, notes, updated_at, is_deleted, entry_id, client_version))
-
-        if cursor.rowcount == 0:
-            conn.rollback()
-            conn.close()
-            self._send_json(409, {
-                "error": "并发修改冲突：记录版本在更新过程中已变更，请刷新后重试！",
-                "code": "CONCURRENT_CONFLICT"
-            })
-            return
+                version = ?
+            WHERE id = ?
+        """, (name, url, username, encrypted_password, iv, salt, notes, updated_at, is_deleted, new_gv, entry_id))
 
         conn.commit()
 
         cursor.execute("SELECT * FROM password_entries WHERE id = ?", (entry_id,))
         updated = dict(cursor.fetchone())
+        updated["global_version"] = new_gv
         conn.close()
 
         self._send_json(200, updated)

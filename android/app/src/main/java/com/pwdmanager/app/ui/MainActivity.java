@@ -63,6 +63,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         syncManager = new SyncManager(this);
 
         initViews();
+        updateTitleWithVersion();
         setupEvents();
 
         loadLocalData();
@@ -128,10 +129,11 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
 
         syncManager.syncWithServer(new SyncManager.SyncCallback() {
             @Override
-            public void onSuccess(int addedOrUpdatedCount, String syncTime) {
+            public void onSuccess(int addedOrUpdatedCount, long currentGlobalVersion) {
                 swipeRefresh.setRefreshing(false);
-                tvSyncStatus.setText("已同步 (" + addedOrUpdatedCount + " 条)");
+                tvSyncStatus.setText("已同步 (v" + currentGlobalVersion + ", " + addedOrUpdatedCount + " 条)");
                 loadLocalData();
+                updateTitleWithVersion();
             }
 
             @Override
@@ -306,26 +308,37 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     }
 
     private void executeServerUpdate(PasswordItem item, AlertDialog editDialog, Button btnSave) {
+        long currentGv = dbHelper.getGlobalVersion();
+        item.setVersion((int) (currentGv & 0x7FFFFFFF)); // compatibility
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                ApiClient.HttpResponse updateRes = ApiClient.updatePassword(MainActivity.this, item);
+                JSONObject payload = item.toJson();
+                payload.put("version", currentGv);
+                payload.put("global_version", currentGv);
+
+                String baseUrl = ApiClient.getServerUrl(MainActivity.this);
+                String endpoint = baseUrl + "/api/passwords/" + item.getId();
+                ApiClient.HttpResponse updateRes = ApiClient.authenticatedRequest(MainActivity.this, endpoint, "PUT", payload);
+
                 runOnUiThread(() -> {
                     if (btnSave != null) {
                         btnSave.setEnabled(true);
                         btnSave.setText(R.string.save_and_push);
                     }
                     if (updateRes.isSuccess) {
-                        // Server update succeeded atomically -> Now save to local database
                         try {
                             JSONObject obj = new JSONObject(updateRes.body);
                             PasswordItem updatedItem = PasswordItem.fromJson(obj);
                             updatedItem.setPassword(item.getPassword());
+                            long newGv = obj.optLong("global_version", currentGv + 1);
+                            dbHelper.setGlobalVersion(newGv);
                             dbHelper.upsertPassword(updatedItem);
                             loadLocalData();
                             if (editDialog != null) editDialog.dismiss();
-                            Toast.makeText(MainActivity.this, "修改成功 (版本已自增至 v" + updatedItem.getVersion() + ")，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "修改成功 (全局版本已自增至 v" + newGv + ")，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                            updateTitleWithVersion();
                         } catch (Exception e) {
-                            item.setVersion(item.getVersion() + 1);
+                            dbHelper.incrementGlobalVersion();
                             dbHelper.upsertPassword(item);
                             loadLocalData();
                             if (editDialog != null) editDialog.dismiss();
@@ -337,17 +350,17 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         try {
                             JSONObject errObj = new JSONObject(updateRes.body);
                             if ("VERSION_MISMATCH".equals(errObj.optString("code"))) {
-                                int sVer = errObj.optInt("server_version", 1);
-                                int cVer = errObj.optInt("client_version", 1);
+                                long sVer = errObj.optLong("server_version", 0L);
+                                long cVer = errObj.optLong("client_version", currentGv);
                                 new AlertDialog.Builder(MainActivity.this)
-                                        .setTitle("⚠️ 版本冲突 (Version Mismatch)")
-                                        .setMessage("服务端版本已由其他客户端更新至 v" + sVer + "，而当前本地提交版本为 v" + cVer + "。\n服务端已拒绝修改以保护数据一致性。\n\n请选择处理方式：")
+                                        .setTitle("⚠️ 全局版本冲突 (Version Mismatch)")
+                                        .setMessage("服务端全局版本已更新至 v" + sVer + "，而当前本地提交版本为 v" + cVer + "。\n服务端已拒绝修改以保护数据一致性。\n\n请选择处理方式：")
                                         .setPositiveButton("拉取服务端最新数据覆盖本地", (d, w) -> {
                                             performSync();
                                             if (editDialog != null) editDialog.dismiss();
                                         })
                                         .setNeutralButton("强制以最新版本号重试覆盖", (d, w) -> {
-                                            item.setVersion(sVer);
+                                            dbHelper.setGlobalVersion(sVer);
                                             executeServerUpdate(item, editDialog, btnSave);
                                         })
                                         .setNegativeButton("取消", null)
@@ -375,6 +388,12 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 });
             }
         });
+    }
+
+    private void updateTitleWithVersion() {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setSubtitle("全局版本: v" + dbHelper.getGlobalVersion());
+        }
     }
 
     private void showConflictResolutionDialog(PasswordItem item, String serverPassword, String localOriginalPassword, String newlyEnteredPassword, AlertDialog editDialog) {
