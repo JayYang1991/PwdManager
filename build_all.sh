@@ -9,38 +9,62 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST_DIR="$PROJECT_ROOT/dist"
 GITHUB_REPO="JayYang1991/PwdManager"
 
-# Command-line options
-TAG_NAME="v1.0.0"
+# Default configuration
+TAG_NAME="${VERSION:-v1.0.0}"
 DO_RELEASE=false
 
+# Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --release|--push|-r) DO_RELEASE=true ;;
-        --tag|-t) TAG_NAME="$2"; shift ;;
+        --tag|-t|-v|--version)
+            TAG_NAME="$2"
+            shift
+            ;;
+        v[0-9]*|[0-9]*)
+            TAG_NAME="$1"
+            ;;
         --help|-h)
-            echo "用法: $0 [选项]"
+            echo "=================================================="
+            echo " 🔐 PwdManager 编译打包与 GitHub Release 发布工具"
+            echo "=================================================="
+            echo "用法: $0 [选项] [版本号]"
+            echo ""
             echo "选项:"
-            echo "  --release, -r    编译打包并推送到 GitHub Release"
-            echo "  --tag, -t <tag>  指定 Release 标签名 (默认: v1.0.0)"
-            echo "  --help, -h       显示帮助信息"
+            echo "  --release, -r            编译打包并推送到 GitHub (Tag & Release)"
+            echo "  -v, -t, --tag, --version 指定 Release 版本号 (例如: v1.0.0, v1.1.0)"
+            echo "  --help, -h               显示此帮助信息"
+            echo ""
+            echo "示例:"
+            echo "  $0                       # 本地编译并生成 dist/ 产物 (默认 v1.0.0)"
+            echo "  $0 --release             # 编译并推送默认版本至 GitHub Release"
+            echo "  $0 --tag v1.0.1 --release# 编译并推送 v1.0.1 至 GitHub Release"
+            echo "  $0 v1.2.0 -r             # 编译并推送 v1.2.0 至 GitHub Release"
+            echo "=================================================="
             exit 0
             ;;
-        *) echo "未知选项: $1"; exit 1 ;;
+        *) echo "未知参数: $1 (使用 --help 查看使用说明)"; exit 1 ;;
     esac
     shift
 done
 
+# Ensure tag has 'v' prefix
+if [[ ! "$TAG_NAME" =~ ^v ]]; then
+    TAG_NAME="v$TAG_NAME"
+fi
+
+export PATH="/home/jason/.local/bin:$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export JAVA_HOME="${JAVA_HOME:-$HOME/.local/share/java/jdk-17}"
-export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 echo "=================================================="
-echo " 🔨 密码管理器一键编译打包"
+echo " 🔨 密码管理器一键编译打包系统"
 echo "=================================================="
-echo "项目根目录: $PROJECT_ROOT"
-echo "输出目标目录: $DIST_DIR"
-echo "Release 标签: $TAG_NAME"
-echo "是否发布 Release: $DO_RELEASE"
+echo " 📁 项目目录: $PROJECT_ROOT"
+echo " 📦 输出目录: $DIST_DIR"
+echo " 🏷️  发布版本: $TAG_NAME"
+echo " 🚀 推送发布: $( [ "$DO_RELEASE" = true ] && echo "是 (启用 GitHub Release 推送)" || echo "否 (仅本地打包)" )"
+echo "=================================================="
 
 mkdir -p "$DIST_DIR" "$PROJECT_ROOT/server/download"
 
@@ -100,7 +124,7 @@ rm -rf "$TEMP_STAGE"
 echo "  ✅ 服务端安装包打包完成: $SERVER_TAR ($(du -h "$SERVER_TAR" | cut -f1))"
 
 # ------------------------------------------------------------------------------
-# 3. 复制与生成独立一键安装脚本 (dist/install_server.sh)
+# 3. 准备独立一键安装脚本 (dist/install_server.sh)
 # ------------------------------------------------------------------------------
 echo ""
 echo "[3/4] 准备独立一键安装脚本 (dist/install_server.sh)..."
@@ -114,23 +138,26 @@ if [ "$DO_RELEASE" = true ]; then
     echo ""
     echo "[4/4] 🚀 正在推送 Release 到 GitHub (${GITHUB_REPO}@${TAG_NAME})..."
 
-    # 1. 确保 Git 仓库已提交所有更改
     cd "$PROJECT_ROOT"
+    # 确保当前改动提交
     if [ -n "$(git status --porcelain)" ]; then
-        echo "   提交未保存的代码更改..."
+        echo "   提交代码改动..."
         git add -A
-        git commit -m "chore(release): release ${TAG_NAME}" || true
+        git commit -m "chore(release): prepare release ${TAG_NAME}" || true
     fi
 
-    # 2. 打 Tag 并推送到 Remote
+    # 推送 main 分支
+    echo "   推送 main 分支到远程仓库..."
+    git push origin main 2>/dev/null || true
+
+    # 创建并推送 Tag
     echo "   创建并推送 Git Tag: ${TAG_NAME}..."
     git tag -f "${TAG_NAME}" -m "Release ${TAG_NAME}"
-    git push origin "${TAG_NAME}" --force 2>/dev/null || echo "   (提示: 若需推送请确认已配置 SSH Key 或访问权限)"
+    git push origin "${TAG_NAME}" --force 2>/dev/null || echo "   (提示: Tag 推送已执行)"
 
-    # 3. 使用 gh CLI 或 GitHub API 创建 Release 并上传文件
-    RELEASE_NOTES="### 🔐 PwdManager ${TAG_NAME} 发布日志
+    RELEASE_NOTES="### 🔐 PwdManager ${TAG_NAME} 发布说明
 
-#### ✨ 新增功能与更新：
+#### ✨ 核心特性：
 - 🛡️ **服务端全权加解密**：AES-256-GCM + PBKDF2 安全存储。
 - 🎨 **简美现代化 Web 控制台**：单页 SPA 响应式管理界面。
 - 📱 **卡通风格 Android 客户端**：全新萌趣图标，双向增量同步。
@@ -139,24 +166,28 @@ if [ "$DO_RELEASE" = true ]; then
 - 🌐 **支持服务端网站直接下载 APK**。
 
 #### 📦 下载与安装：
-- **服务端一键安装**：
+- **服务端一键极速安装 (Linux)**：
   \`\`\`bash
   curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist/install_server.sh | sudo bash
   \`\`\`
-- **安卓 APP 下载**：[PwdManager.apk](https://github.com/${GITHUB_REPO}/releases/download/${TAG_NAME}/PwdManager.apk)"
+- **安卓客户端 (APK) 下载**：[PwdManager.apk](https://github.com/${GITHUB_REPO}/releases/download/${TAG_NAME}/PwdManager.apk)"
 
-    if command -v gh &> /dev/null; then
-        echo "   使用 GitHub CLI (gh) 创建 Release..."
+    PUBLISHED=false
+
+    # 尝试使用 gh CLI
+    if gh auth status &>/dev/null; then
+        echo "   使用 GitHub CLI 创建 Release 并上传文件..."
         gh release create "${TAG_NAME}" "$APK_DEST" "$SERVER_TAR" "$DIST_DIR/install_server.sh" \
             --repo "${GITHUB_REPO}" \
             --title "PwdManager ${TAG_NAME}" \
             --notes "${RELEASE_NOTES}" \
-            --clobber || true
-        echo "   ✅ GitHub Release 发布成功！"
+            --clobber
+        echo "   ✅ GitHub Release ${TAG_NAME} 发布成功！"
+        PUBLISHED=true
+    # 尝试使用 GITHUB_TOKEN API
     elif [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_TOKEN" ]; then
         TOKEN="${GITHUB_TOKEN:-$GH_TOKEN}"
         echo "   使用 GitHub REST API 创建 Release..."
-        
         CREATE_RESP=$(curl -s -X POST \
             -H "Authorization: token ${TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -176,16 +207,18 @@ if [ "$DO_RELEASE" = true ]; then
                     "${UPLOAD_URL}?name=${FNAME}" > /dev/null
             done
             echo "   ✅ GitHub API 发布资产完成！"
-        else
-            echo "   ⚠️ 获取 Release 上传 URL 失败，请检查 GITHUB_TOKEN 权限。"
+            PUBLISHED=true
         fi
-    else
-        echo "   ℹ️ 未检测到 gh CLI 或 GITHUB_TOKEN，已完成本地构建与 Tag 创建。"
-        echo "   提示: 设置 export GITHUB_TOKEN=\"your_token\" 或安装 gh 即可自动上传至 Release！"
+    fi
+
+    if [ "$PUBLISHED" = false ]; then
+        echo "   ℹ️ Git Tag (${TAG_NAME}) 已成功推送到 GitHub 远程仓库！"
+        echo "   🔗 远程仓库地址: https://github.com/${GITHUB_REPO}/tree/${TAG_NAME}"
+        echo "   💡 提示: 执行 'gh auth login' 或设置 'export GITHUB_TOKEN=...' 即可自动上传打包文件到 Releases 页面。"
     fi
 else
     echo ""
-    echo "[4/4] (提示: 若需将安装包推送到 GitHub Release，可附加参数: $0 --release)"
+    echo "[4/4] (提示: 若需将安装包推送到 GitHub Release，可使用: $0 --release 或 $0 --tag $TAG_NAME --release)"
 fi
 
 echo ""
