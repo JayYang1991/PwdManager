@@ -1324,7 +1324,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         </button>
         <div style="margin-top: 18px;">
             <a href="/download/app.apk" class="btn btn-app" style="width: 100%; justify-content: center;">
-                <i class="fa-brands fa-android"></i> 📱 下载卡通版安卓客户端 (APK)
+                <i class="fa-brands fa-android"></i> 📱 下载最新安卓客户端 (APK)
             </a>
         </div>
         <div id="loginMsg" style="color: var(--accent-pink); font-size: 13px; margin-top: 14px; font-weight: 500;"></div>
@@ -2491,8 +2491,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 os.path.join(DOWNLOAD_DIR, "PwdManager.apk"),
                 os.path.join(DOWNLOAD_DIR, "app-debug.apk"),
                 os.path.join(BASE_DIR, "PwdManager.apk"),
-                os.path.join(BASE_DIR, "../android/app/build/outputs/apk/debug/app-debug.apk"),
-                os.path.join(BASE_DIR, "dist/PwdManager.apk")
+                os.path.join(BASE_DIR, "../dist/PwdManager.apk"),
+                os.path.join(BASE_DIR, "dist/PwdManager.apk"),
+                os.path.join(BASE_DIR, "../android/app/build/outputs/apk/debug/app-debug.apk")
             ]
             for cand in candidates:
                 cand_abs = os.path.abspath(cand)

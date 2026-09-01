@@ -93,7 +93,6 @@ else
     if curl -fsSL "${AUTH_ARGS[@]}" -o "$TEMP_DIR/pwdmanager-server/app.py" "${RAW_BASE_URL}/server/app.py" 2>/dev/null && \
        curl -fsSL "${AUTH_ARGS[@]}" -o "$TEMP_DIR/pwdmanager-server/update_server.sh" "${RAW_BASE_URL}/update_server.sh" 2>/dev/null; then
         echo "   ✅ 成功从 GitHub 源码分支拉取最新核心程序！"
-        curl -fL "${AUTH_ARGS[@]}" --connect-timeout 10 -o "$TEMP_DIR/pwdmanager-server/download/PwdManager.apk" "https://github.com/${GITHUB_REPO}/releases/latest/download/PwdManager.apk" 2>/dev/null || true
         DOWNLOADED=true
     fi
 fi
@@ -105,7 +104,27 @@ if [ "$DOWNLOADED" != true ]; then
     exit 1
 fi
 
-# 5. 平滑覆盖更新程序文件 (严格保留数据库 passwords.db 与历史配置)
+# 5. 前置依赖组件与环境健康检测
+echo ""
+echo "  🔍 正在校验 Python3 与核心加密库 (cryptography)..."
+if ! python3 -c "import cryptography; from cryptography.hazmat.primitives.ciphers.aead import AESGCM" 2>/dev/null; then
+    echo "  ⚠️ 检测到 Python cryptography 模块缺失，正在自动补全依赖..."
+    if command -v apt-get &> /dev/null; then
+        $SUDO apt-get update -y -qq 2>/dev/null || true
+        $SUDO apt-get install -y --no-install-recommends python3-cryptography 2>/dev/null || true
+    elif command -v dnf &> /dev/null; then
+        $SUDO dnf install -y python3-cryptography 2>/dev/null || true
+    elif command -v yum &> /dev/null; then
+        $SUDO yum install -y python3-cryptography 2>/dev/null || true
+    fi
+    if ! python3 -c "import cryptography" 2>/dev/null; then
+        if command -v pip3 &> /dev/null; then
+            $SUDO pip3 install cryptography --break-system-packages 2>/dev/null || $SUDO pip3 install cryptography 2>/dev/null || true
+        fi
+    fi
+fi
+
+# 6. 平滑覆盖更新程序文件 (严格保留数据库 passwords.db 与历史配置)
 echo ""
 echo "=================================================="
 echo " [3/4] 正在平滑覆盖程序文件 (保留所有数据与私钥)..."
@@ -116,18 +135,34 @@ STAGE_DIR="$TEMP_DIR/pwdmanager-server"
 if [ -f "$STAGE_DIR/app.py" ]; then
     $SUDO cp -f "$STAGE_DIR/app.py" "$INSTALL_DIR/app.py"
     $SUDO chmod +x "$INSTALL_DIR/app.py"
-    echo "  ✅ 服务端程序更新成功: $INSTALL_DIR/app.py"
+    echo "  ✅ 服务端核心程序更新成功: $INSTALL_DIR/app.py"
 fi
 
-# 覆盖 update_server.sh
-$SUDO cp -f "${BASH_SOURCE[0]}" "$INSTALL_DIR/update_server.sh" 2>/dev/null || true
+# 覆盖 update_server.sh (优先使用发布包中的脚本，防范 curl | bash 时的空 source 问题)
+if [ -f "$STAGE_DIR/update_server.sh" ]; then
+    $SUDO cp -f "$STAGE_DIR/update_server.sh" "$INSTALL_DIR/update_server.sh"
+elif [ -n "${BASH_SOURCE[0]}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    $SUDO cp -f "${BASH_SOURCE[0]}" "$INSTALL_DIR/update_server.sh" 2>/dev/null || true
+fi
 $SUDO chmod +x "$INSTALL_DIR/update_server.sh" 2>/dev/null || true
 
-# 覆盖 APK 安装包
+# 覆盖 uninstall.sh (若存在)
+if [ -f "$STAGE_DIR/uninstall.sh" ]; then
+    $SUDO cp -f "$STAGE_DIR/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
+    $SUDO chmod +x "$INSTALL_DIR/uninstall.sh" 2>/dev/null || true
+fi
+
+# 覆盖与同步 APK 安装包 (若 release 包未包含则在线补充拉取最新 APK)
+$SUDO mkdir -p "$INSTALL_DIR/download"
 if [ -f "$STAGE_DIR/download/PwdManager.apk" ]; then
-    $SUDO mkdir -p "$INSTALL_DIR/download"
     $SUDO cp -f "$STAGE_DIR/download/PwdManager.apk" "$INSTALL_DIR/download/PwdManager.apk"
     echo "  ✅ 安卓客户端 APK 同步更新成功"
+else
+    echo "  📥 正在同步最新安卓客户端 (PwdManager.apk)..."
+    curl -fL "${AUTH_ARGS[@]}" --connect-timeout 10 -o "$INSTALL_DIR/download/PwdManager.apk" "https://github.com/${GITHUB_REPO}/releases/latest/download/PwdManager.apk" 2>/dev/null || true
+    if [ -f "$INSTALL_DIR/download/PwdManager.apk" ]; then
+        echo "  ✅ 安卓客户端 APK 在线拉取并更新成功"
+    fi
 fi
 
 # 建立便捷 CLI 命令
@@ -135,7 +170,7 @@ if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ] || [ "$EUID" -eq 0 ] || [ 
     $SUDO ln -sf "$INSTALL_DIR/update_server.sh" /usr/local/bin/pwdmanager-update 2>/dev/null || true
 fi
 
-# 6. 平滑重启系统服务并校验运行状态
+# 7. 平滑重启系统服务并校验运行状态
 echo ""
 echo "=================================================="
 echo " [4/4] 正在平滑重启服务并进行健康状态校验..."
