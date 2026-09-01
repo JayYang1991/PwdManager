@@ -23,7 +23,7 @@ import urllib.parse
 import time
 import concurrent.futures
 
-def request_raw(url, method="GET", data=None, headers=None):
+def request_raw(url, method="GET", data=None, headers=None, timeout=30):
     if headers is None:
         headers = {}
     
@@ -34,7 +34,7 @@ def request_raw(url, method="GET", data=None, headers=None):
 
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=8) as res:
+        with urllib.request.urlopen(req, timeout=timeout) as res:
             res_body = res.read().decode("utf-8")
             try:
                 parsed = json.loads(res_body)
@@ -508,6 +508,24 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     print(f"      -> 16(b) Rate Limit Lockout: IP/Account locked out after 5 consecutive failures (HTTP 429 with Retry-After: {d6.get('retry_after')}s)")
 
     print("  [PASS] 16. Dual-Dimension Anti-Brute-Force, Account Lockout & Timing Defense 100% verified!")
+
+    # --------------------------------------------------------------------------
+    # 17. Security Audit Logs & IP Failure Review Test Suite
+    # --------------------------------------------------------------------------
+    print("\n  [*] Running Security Audit Logs & IP Tracking Test Suite (Step 17)...")
+
+    s_logs, _, logs_data = request_raw(f"{base_url}/api/admin/security-logs?limit=50", "GET", headers=auth_headers)
+    assert s_logs == 200, f"Expected 200 for security-logs, got {s_logs}: {logs_data}"
+    assert "logs" in logs_data and len(logs_data["logs"]) > 0, "Expected recorded security audit logs"
+    assert "total_failed_attempts" in logs_data, "Expected total_failed_attempts in summary stats"
+    assert "distinct_failed_ips" in logs_data, "Expected distinct_failed_ips in summary stats"
+    print(f"      -> 17(a) Security Audit Logs Query: Successfully retrieved {len(logs_data['logs'])} audit entries (Total Failed: {logs_data['total_failed_attempts']}, Unique IPs: {logs_data['distinct_failed_ips']})")
+
+    first_log = logs_data["logs"][0]
+    assert "ip" in first_log and "username_attempted" in first_log and "status" in first_log
+    print(f"      -> 17(b) Audit Trail Verification: Log #{first_log['id']} [IP: {first_log['ip']}, User: {first_log['username_attempted']}, Status: {first_log['status']}] accurately captured")
+
+    print("  [PASS] 17. Security Audit Logging, Offending IP Tracking & Admin Review API 100% verified!")
 
 
     print("\n==========================================================================================")

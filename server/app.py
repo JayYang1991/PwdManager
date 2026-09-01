@@ -127,9 +127,45 @@ def record_failed_attempt(client_ip: str, username: str = None) -> int:
 def clear_failed_attempts(client_ip: str, username: str = None):
     """Clear failed attempt history upon successful authentication."""
     with RATE_LIMIT_LOCK:
-        FAILED_ATTEMPTS_IP.pop(client_ip, None)
+        if client_ip:
+            FAILED_ATTEMPTS_IP.pop(client_ip, None)
         if username:
             FAILED_ATTEMPTS_USER.pop(username.strip().lower(), None)
+
+def get_active_lockouts() -> dict:
+    """Return lists of currently locked out IPs and Users with remaining seconds."""
+    now = time.time()
+    locked_ips = []
+    locked_users = []
+    with RATE_LIMIT_LOCK:
+        for ip, atts in FAILED_ATTEMPTS_IP.items():
+            valid_atts = [t for t in atts if now - t < LOCKOUT_DURATION]
+            if len(valid_atts) >= MAX_FAILED_ATTEMPTS:
+                remaining = max(1, int(LOCKOUT_DURATION - (now - valid_atts[-MAX_FAILED_ATTEMPTS])))
+                locked_ips.append({"ip": ip, "remaining_seconds": remaining, "failed_count": len(valid_atts)})
+
+        for user, atts in FAILED_ATTEMPTS_USER.items():
+            valid_atts = [t for t in atts if now - t < LOCKOUT_DURATION]
+            if len(valid_atts) >= MAX_FAILED_ATTEMPTS:
+                remaining = max(1, int(LOCKOUT_DURATION - (now - valid_atts[-MAX_FAILED_ATTEMPTS])))
+                locked_users.append({"username": user, "remaining_seconds": remaining, "failed_count": len(valid_atts)})
+
+    return {"locked_ips": locked_ips, "locked_users": locked_users}
+
+def record_security_log(ip: str, username: str, user_agent: str, status: str, failure_reason: str):
+    """Record security audit logs (failed logins, lockouts, successful logins) into database."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("PRAGMA busy_timeout=5000;")
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO security_audit_logs (ip, username_attempted, user_agent, status, failure_reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (ip, username or 'unknown', user_agent[:255] if user_agent else '', status, failure_reason, get_iso_now()))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[-] Failed to record security audit log: {e}")
 
 def get_iso_now():
     return datetime.now(timezone.utc).isoformat()
@@ -245,6 +281,21 @@ def init_db():
                 password_hash=excluded.password_hash, salt=excluded.salt, role=excluded.role,
                 token=excluded.token, token_expire_at=excluded.token_expire_at, updated_at=excluded.updated_at
         """, (phash, salt, token, token_exp, now))
+
+    # 4. Security Audit Logs Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS security_audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            username_attempted TEXT NOT NULL,
+            user_agent TEXT DEFAULT '',
+            status TEXT NOT NULL,
+            failure_reason TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_security_logs_created ON security_audit_logs(created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_security_logs_ip ON security_audit_logs(ip)")
 
     # 2. Passwords table
     cursor.execute("""
@@ -883,6 +934,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <i class="fa-brands fa-android"></i> 下载 APP
             </a>
             <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel"></span>
+            <button class="btn btn-outline" style="border-color: rgba(244, 63, 94, 0.5); color: #FDA4AF;" onclick="showSecurityLogsModal()"><i class="fa-solid fa-shield-virus"></i> 安全审计日志</button>
             <button class="btn btn-outline" onclick="showChangePwdModal()"><i class="fa-solid fa-lock"></i> 修改密码</button>
             <button class="btn btn-outline" onclick="showRotateKeyModal()"><i class="fa-solid fa-key"></i> 更换私钥</button>
             <button class="btn btn-outline" onclick="exportData()"><i class="fa-solid fa-download"></i> 导出</button>
@@ -1508,6 +1560,101 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function escapeHtml(s) { return (s||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
     function escapeJs(s) { return (s || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
+    function showSecurityLogsModal() {
+        openModal('securityLogsModal');
+        loadSecurityLogs();
+    }
+
+    async function loadSecurityLogs() {
+        const tbody = document.getElementById("securityLogsTableBody");
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-sub);"><i class="fa-solid fa-spinner fa-spin"></i> 正在加载安全审计日志...</td></tr>`;
+
+        try {
+            const res = await apiRequest("/api/admin/security-logs?limit=100");
+            document.getElementById("secStatFailed").innerText = res.total_failed_attempts || 0;
+            document.getElementById("secStatIps").innerText = res.distinct_failed_ips || 0;
+
+            const activeIps = (res.active_lockouts && res.active_lockouts.locked_ips) || [];
+            const activeUsers = (res.active_lockouts && res.active_lockouts.locked_users) || [];
+            document.getElementById("secStatLocked").innerText = activeIps.length + activeUsers.length;
+
+            const lockoutSec = document.getElementById("activeLockoutSection");
+            const lockoutList = document.getElementById("activeLockoutList");
+            if (activeIps.length > 0 || activeUsers.length > 0) {
+                lockoutSec.style.display = "block";
+                let chipsHtml = "";
+                activeIps.forEach(item => {
+                    chipsHtml += `<div style="background: rgba(244,63,94,0.2); border: 1px solid var(--accent-pink); padding: 5px 12px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span>IP: <b style="font-family: monospace;">${escapeHtml(item.ip)}</b> (已封禁，剩余 ${item.remaining_seconds}s)</span>
+                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-color: rgba(244,63,94,0.5); color: #FDA4AF;" onclick="unlockTarget('${escapeJs(item.ip)}', null)">立即解封</button>
+                    </div>`;
+                });
+                activeUsers.forEach(item => {
+                    chipsHtml += `<div style="background: rgba(245,158,11,0.2); border: 1px solid #F59E0B; padding: 5px 12px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span>账号: <b style="font-family: monospace;">${escapeHtml(item.username)}</b> (已锁定，剩余 ${item.remaining_seconds}s)</span>
+                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-color: rgba(245,158,11,0.5); color: #FCD34D;" onclick="unlockTarget(null, '${escapeJs(item.username)}')">立即解锁</button>
+                    </div>`;
+                });
+                lockoutList.innerHTML = chipsHtml;
+            } else {
+                lockoutSec.style.display = "none";
+            }
+
+            if (!res.logs || res.logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--text-sub);"><i class="fa-solid fa-circle-check" style="color: #10B981;"></i> 暂无异常登录或失败拦截记录，系统运行安全</td></tr>`;
+                return;
+            }
+
+            let html = "";
+            res.logs.forEach(l => {
+                let statusBadge = "";
+                if (l.status === "FAILED") {
+                    statusBadge = `<span style="background: rgba(244,63,94,0.15); color: var(--accent-pink); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">失败 (401)</span>`;
+                } else if (l.status === "LOCKED_OUT") {
+                    statusBadge = `<span style="background: rgba(239,68,68,0.25); color: #FF4D4D; border: 1px solid #EF4444; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">封禁拦截 (429)</span>`;
+                } else {
+                    statusBadge = `<span style="background: rgba(16,185,129,0.15); color: #10B981; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">成功 (200)</span>`;
+                }
+
+                const timeStr = l.created_at ? l.created_at.replace("T", " ").substring(0, 19) : "";
+                const uaShort = l.user_agent ? (l.user_agent.length > 38 ? escapeHtml(l.user_agent.substring(0, 38)) + "..." : escapeHtml(l.user_agent)) : "-";
+
+                html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 10px 14px; color: var(--text-sub); white-space: nowrap; font-family: monospace;">${timeStr}</td>
+                    <td style="padding: 10px 14px; font-family: monospace; font-weight: 600; color: #FFFFFF;">${escapeHtml(l.ip)}</td>
+                    <td style="padding: 10px 14px; font-weight: 500; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(l.username_attempted)}</td>
+                    <td style="padding: 10px 14px;">${statusBadge}</td>
+                    <td style="padding: 10px 14px; color: var(--text-sub);">${escapeHtml(l.failure_reason)}</td>
+                    <td style="padding: 10px 14px; color: var(--text-sub); font-size: 11px;" title="${escapeHtml(l.user_agent)}">${uaShort}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--accent-pink);">加载失败: ${escapeHtml(e.message)}</td></tr>`;
+        }
+    }
+
+    async function unlockTarget(ip, username) {
+        try {
+            await apiRequest("/api/admin/security-logs/unlock", "POST", { ip: ip, username: username });
+            showToast("🔓 已成功解除锁定！");
+            loadSecurityLogs();
+        } catch (e) {
+            showToast(`❌ 解锁失败: ${e.message}`, "fa-triangle-exclamation");
+        }
+    }
+
+    async function clearSecurityLogs() {
+        if (!confirm("确定要清空所有历史安全审计与拦截日志吗？")) return;
+        try {
+            await apiRequest("/api/admin/security-logs", "DELETE");
+            showToast("🧹 安全审计日志已清空！");
+            loadSecurityLogs();
+        } catch (e) {
+            showToast(`❌ 清空失败: ${e.message}`, "fa-triangle-exclamation");
+        }
+    }
+
     if (authToken) {
         initApp();
     }
@@ -1671,6 +1818,53 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         user = self._get_auth_user()
 
+        # Security Audit Logs API
+        if path == '/api/admin/security-logs':
+            if not user or user.get('role') != 'admin':
+                self._send_json(403, {"error": "Forbidden: Administrator privileges required"})
+                return
+
+            limit = int(query.get('limit', ['100'])[0])
+            offset = int(query.get('offset', ['0'])[0])
+            filter_ip = query.get('ip', [None])[0]
+            filter_status = query.get('status', [None])[0]
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT COUNT(*) FROM security_audit_logs WHERE status != 'SUCCESS'")
+            total_failed = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(DISTINCT ip) FROM security_audit_logs WHERE status != 'SUCCESS'")
+            distinct_ips = cursor.fetchone()[0]
+
+            sql = "SELECT id, ip, username_attempted, user_agent, status, failure_reason, created_at FROM security_audit_logs WHERE 1=1"
+            params = []
+            if filter_ip:
+                sql += " AND ip = ?"
+                params.append(filter_ip)
+            if filter_status:
+                sql += " AND status = ?"
+                params.append(filter_status)
+
+            sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+            params.extend([min(limit, 500), offset])
+
+            cursor.execute(sql, params)
+            logs = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+
+            lockout_info = get_active_lockouts()
+
+            self._send_json(200, {
+                "status": "ok",
+                "total_failed_attempts": total_failed,
+                "distinct_failed_ips": distinct_ips,
+                "active_lockouts": lockout_info,
+                "logs": logs
+            })
+            return
+
         # Auth Check Me
         if path == '/api/auth/me':
             if not user:
@@ -1817,10 +2011,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         if path == '/api/auth/login' or path == '/api/admin/login':
             username = (body.get('username') or body.get('user') or '').strip()
             password = str(body.get('password') or body.get('admin_secret') or '')
+            user_agent = self.headers.get('User-Agent', '')
 
             # Check IP and Username rate limits
             is_locked, retry_after, lock_msg = check_rate_limit(client_ip, username)
             if is_locked:
+                record_security_log(client_ip, username, user_agent, "LOCKED_OUT", lock_msg)
                 self.send_response(429)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Retry-After', str(retry_after))
@@ -1851,12 +2047,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                     authenticated = True
             else:
                 # Timing Attack & Enumeration Shield:
-                # Execute identical 100,000-iteration PBKDF2 calculation for non-existent users
-                # so compute times are indistinguishable to external observers.
                 hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), b'pwdmanager_timing_shield_salt_2026', 100000)
 
             if authenticated:
                 clear_failed_attempts(client_ip, username)
+                record_security_log(client_ip, username, user_agent, "SUCCESS", "登录成功")
                 token = secrets.token_hex(32)
                 token_exp = get_iso_future(30)
                 cursor.execute("UPDATE users SET token = ?, token_expire_at = ?, updated_at = ? WHERE username = ?",
@@ -1873,12 +2068,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 conn.close()
                 remaining = record_failed_attempt(client_ip, username)
-                # Progressive backoff delay (slows down automated bot attacks)
                 time.sleep(0.3)
                 if remaining > 0:
                     err_msg = f"用户名或密码错误 (还剩 {remaining} 次尝试机会，连续失败将锁定 5 分钟)"
                 else:
                     err_msg = f"用户名或密码错误，尝试次数已达上限，已触发 5 分钟安全锁定"
+                record_security_log(client_ip, username, user_agent, "FAILED", err_msg)
                 self._send_json(401, {
                     "error": err_msg,
                     "remaining_attempts": remaining,
@@ -2227,6 +2422,19 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
+        if path == '/api/admin/security-logs':
+            user = self._get_auth_user()
+            if not user or user.get('role') != 'admin':
+                self._send_json(403, {"error": "Forbidden: Administrator privileges required"})
+                return
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM security_audit_logs")
+            conn.commit()
+            conn.close()
+            self._send_json(200, {"success": True, "message": "安全审计日志已成功清空"})
+            return
+
         if not path.startswith('/api/passwords/'):
             self._send_json(404, {"error": "Endpoint not found"})
             return
@@ -2337,6 +2545,19 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
+        if path == '/api/admin/security-logs':
+            user = self._get_auth_user()
+            if not user or user.get('role') != 'admin':
+                self._send_json(403, {"error": "Forbidden: Administrator privileges required"})
+                return
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM security_audit_logs")
+            conn.commit()
+            conn.close()
+            self._send_json(200, {"success": True, "message": "安全审计日志已成功清空"})
+            return
+
         if not path.startswith('/api/passwords/'):
             self._send_json(404, {"error": "Endpoint not found"})
             return
