@@ -1331,7 +1331,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         // Disallow duplicate website name on frontend
-        const dupeItem = allPasswords.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase() && p.id !== id && !p.is_deleted);
+        const dupeItem = allRecords.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase() && p.id !== id && !p.is_deleted);
         if (dupeItem) {
             showToast(`⚠️ 已存在相同名称「${escapeHtml(name)}」的记录，不允许重复添加！请直接在该记录上修改。`, "fa-triangle-exclamation");
             return;
