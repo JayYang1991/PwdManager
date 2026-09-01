@@ -192,6 +192,31 @@
             android:text="🔄 一键更换主加密私钥 (密钥轮换)"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:textColor="@color/primary_dark"
+            android:layout_marginBottom="16dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section 4: In-App Update -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🚀 应用更新与安装"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnCheckAppUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📲 检查服务端更新并直接安装"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:textColor="@color/primary"
             android:layout_marginBottom="20dp" />
 
         <!-- Save and Cancel Actions -->

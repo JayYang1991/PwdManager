@@ -33,6 +33,15 @@ import org.json.JSONObject;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Executors;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import androidx.core.content.FileProvider;
 
 public class MainActivity extends AppCompatActivity implements PasswordAdapter.OnItemActionListener {
 
@@ -460,6 +469,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         Button btnExport = dialogView.findViewById(R.id.btnExportBackup);
         Button btnImport = dialogView.findViewById(R.id.btnOpenImport);
         Button btnRotateKey = dialogView.findViewById(R.id.btnOpenRotateKey);
+        Button btnCheckAppUpdate = dialogView.findViewById(R.id.btnCheckAppUpdate);
         Button btnCancel = dialogView.findViewById(R.id.btnSettingsCancel);
         Button btnSave = dialogView.findViewById(R.id.btnSettingsSave);
 
@@ -491,6 +501,9 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         btnExport.setOnClickListener(v -> showExportBackupDialog());
         btnImport.setOnClickListener(v -> showImportBackupDialog());
         btnRotateKey.setOnClickListener(v -> showRotateKeyDialog());
+        if (btnCheckAppUpdate != null) {
+            btnCheckAppUpdate.setOnClickListener(v -> checkAndInstallAppUpdate());
+        }
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
@@ -804,6 +817,122 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+
+        private void checkAndInstallAppUpdate() {
+        String baseUrl = ApiClient.getServerUrl(this);
+        Toast.makeText(this, "正在检查服务端版本与安装包...", Toast.LENGTH_SHORT).show();
+
+        bgExecutor.execute(() -> {
+            try {
+                ApiClient.HttpResponse res = ApiClient.authenticatedRequest(this, baseUrl + "/api/health", "GET", null);
+                if (!res.isSuccess) {
+                    runOnUiThread(() -> Toast.makeText(this, "检查更新失败: 无法连接服务端", Toast.LENGTH_SHORT).show());
+                    return;
+                }
+                JSONObject obj = new JSONObject(res.body);
+                String serverVer = obj.optString("version", "2.1.0");
+
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    String msg = "• 当前客户端版本: v1.0 (Build 1)\n" +
+                            "• 服务端系统版本: v" + serverVer + "\n" +
+                            "• 安装包源: " + baseUrl + "/download/app.apk\n\n" +
+                            "本项目已配置统一发布签名，支持直接覆盖更新安装。\n是否立即下载并进行更新安装？";
+                    new AlertDialog.Builder(this)
+                            .setTitle("🚀 检查应用安装包")
+                            .setMessage(msg)
+                            .setPositiveButton("立即下载并安装", (d, w) -> startDownloadAndInstallApk(baseUrl + "/download/app.apk"))
+                            .setNegativeButton("取消", null)
+                            .show();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "检查更新失败: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    private void startDownloadAndInstallApk(String apkUrl) {
+        Toast.makeText(this, "开始下载最新安装包...", Toast.LENGTH_SHORT).show();
+        bgExecutor.execute(() -> {
+            File apkFile = null;
+            try {
+                URL url = new URL(apkUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(60000);
+                String token = ApiClient.getAuthToken(this);
+                if (token != null) {
+                    conn.setRequestProperty("Authorization", "Bearer " + token);
+                }
+                conn.connect();
+
+                if (conn.getResponseCode() != 200) {
+                    throw new IllegalStateException("下载失败，服务端返回 HTTP " + conn.getResponseCode());
+                }
+
+                File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                if (downloadsDir == null) downloadsDir = getCacheDir();
+                apkFile = new File(downloadsDir, "PwdManager_update.apk");
+                if (apkFile.exists()) apkFile.delete();
+
+                try (InputStream is = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(apkFile)) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = is.read(buffer)) != -1) {
+                        fos.write(buffer, 0, len);
+                    }
+                    fos.flush();
+                }
+                conn.disconnect();
+
+                final File finalApkFile = apkFile;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    installApk(finalApkFile);
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(this, "下载安装包失败: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void installApk(File apkFile) {
+        if (apkFile == null || !apkFile.exists()) {
+            Toast.makeText(this, "安装包文件不存在", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            Intent installIntent = new Intent(Intent.ACTION_VIEW);
+            installIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Uri apkUri;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                apkUri = FileProvider.getUriForFile(
+                        this,
+                        getPackageName() + ".fileprovider",
+                        apkFile
+                );
+                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } else {
+                apkUri = Uri.fromFile(apkFile);
+            }
+
+            installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            startActivity(installIntent);
+            Toast.makeText(this, "已启动系统安装程序，请确认覆盖安装！", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            new AlertDialog.Builder(this)
+                    .setTitle("无法启动安装程序")
+                    .setMessage("错误: " + e.getMessage() + "\n若为 Android 8.0+，请确保已授予「安装未知应用」权限。")
+                    .setPositiveButton("我知道了", null)
+                    .show();
+        }
     }
 
     @Override
