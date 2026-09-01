@@ -2,6 +2,7 @@ package com.pwdmanager.app.network;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.pwdmanager.app.model.PasswordItem;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.BufferedReader;
@@ -160,6 +161,28 @@ public class ApiClient {
         }
 
         return new HttpResponse(responseCode, sb.toString());
+    }
+
+    // --- Password CRUD Server Operations ---
+
+    public static HttpResponse createPassword(Context context, PasswordItem item) throws Exception {
+        String url = getServerUrl(context) + "/api/passwords";
+        return authenticatedRequest(context, url, "POST", item.toJson());
+    }
+
+    public static HttpResponse updatePassword(Context context, PasswordItem item) throws Exception {
+        String url = getServerUrl(context) + "/api/passwords/" + item.getId();
+        return authenticatedRequest(context, url, "PUT", item.toJson());
+    }
+
+    public static HttpResponse getSinglePassword(Context context, String id, boolean decrypt) throws Exception {
+        String url = getServerUrl(context) + "/api/passwords/" + id + (decrypt ? "?decrypt=1" : "");
+        return authenticatedRequest(context, url, "GET", null);
+    }
+
+    public static HttpResponse deletePassword(Context context, String id) throws Exception {
+        String url = getServerUrl(context) + "/api/passwords/" + id;
+        return authenticatedRequest(context, url, "DELETE", null);
     }
 
     // --- Admin Feature APIs ---

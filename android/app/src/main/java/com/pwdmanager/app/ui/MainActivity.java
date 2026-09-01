@@ -199,47 +199,182 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
             // Duplicate validation (Disallow duplicate website name, url and username)
             String excludeId = isEdit && existingItem != null ? existingItem.getId() : null;
             if (dbHelper.existsDuplicate(excludeId, name, url, username)) {
-                Toast.makeText(MainActivity.this, "已存在相同的网站名称、网址与账号，不允许重复添加！", Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, "已存在相同的网站名称、网址与账号，不允许重复！", Toast.LENGTH_LONG).show();
                 etName.setError("已存在完全相同的记录");
                 return;
             }
 
-            try {
-                PasswordItem item = isEdit ? existingItem : new PasswordItem();
-                item.setName(name);
-                item.setUrl(url);
-                item.setUsername(username);
-                item.setPassword(password);
-                item.setNotes(notes);
-                item.setUpdatedAt(PasswordItem.getIsoNow());
-                item.setIsDeleted(0);
+            btnSave.setEnabled(false);
+            btnSave.setText(isEdit ? "正在同步服务端..." : "正在提交服务端...");
 
-                // Save locally
-                dbHelper.upsertPassword(item);
-                loadLocalData();
-                dialog.dismiss();
+            if (!isEdit) {
+                // Case 1: Create new password (Must push and encrypt on server first)
+                PasswordItem newItem = new PasswordItem();
+                newItem.setName(name);
+                newItem.setUrl(url);
+                newItem.setUsername(username);
+                newItem.setPassword(password);
+                newItem.setNotes(notes);
+                newItem.setCreatedAt(PasswordItem.getIsoNow());
+                newItem.setUpdatedAt(PasswordItem.getIsoNow());
+                newItem.setIsDeleted(0);
 
-                // Push to server (Server handles encryption)
-                syncManager.pushRecord(item, new SyncManager.PushCallback() {
-                    @Override
-                    public void onSuccess(PasswordItem saved) {
-                        Toast.makeText(MainActivity.this, "已保存并在服务端完成加密", Toast.LENGTH_SHORT).show();
-                        performSync();
-                    }
-
-                    @Override
-                    public void onError(String errorMsg) {
-                        Toast.makeText(MainActivity.this, "已保存在本地，" + errorMsg, Toast.LENGTH_LONG).show();
+                Executors.newSingleThreadExecutor().execute(() -> {
+                    try {
+                        ApiClient.HttpResponse res = ApiClient.createPassword(MainActivity.this, newItem);
+                        runOnUiThread(() -> {
+                            btnSave.setEnabled(true);
+                            btnSave.setText(R.string.save_and_push);
+                            if (res.isSuccess) {
+                                try {
+                                    JSONObject obj = new JSONObject(res.body);
+                                    PasswordItem saved = PasswordItem.fromJson(obj);
+                                    saved.setPassword(password);
+                                    dbHelper.upsertPassword(saved);
+                                    loadLocalData();
+                                    dialog.dismiss();
+                                    Toast.makeText(MainActivity.this, "已保存并在服务端完成加密", Toast.LENGTH_SHORT).show();
+                                    performSync();
+                                } catch (Exception e) {
+                                    newItem.setPassword(password);
+                                    dbHelper.upsertPassword(newItem);
+                                    loadLocalData();
+                                    dialog.dismiss();
+                                    Toast.makeText(MainActivity.this, "已保存", Toast.LENGTH_SHORT).show();
+                                }
+                            } else {
+                                String errMsg = parseErrorMessage(res.body, "服务端创建失败");
+                                Toast.makeText(MainActivity.this, "保存失败: " + errMsg + " (本地未保存)", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    } catch (Exception e) {
+                        runOnUiThread(() -> {
+                            btnSave.setEnabled(true);
+                            btnSave.setText(R.string.save_and_push);
+                            Toast.makeText(MainActivity.this, "网络错误: " + e.getMessage() + " (本地未保存)", Toast.LENGTH_LONG).show();
+                        });
                     }
                 });
 
-            } catch (Exception e) {
-                e.printStackTrace();
-                Toast.makeText(MainActivity.this, "保存错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            } else {
+                // Case 2: Edit existing password
+                // Must first check server baseline and update server. Only on server success can local DB be modified.
+                final PasswordItem itemToUpdate = existingItem;
+                final String oldLocalPassword = existingItem.getPassword();
+                itemToUpdate.setName(name);
+                itemToUpdate.setUrl(url);
+                itemToUpdate.setUsername(username);
+                itemToUpdate.setPassword(password);
+                itemToUpdate.setNotes(notes);
+                itemToUpdate.setUpdatedAt(PasswordItem.getIsoNow());
+                itemToUpdate.setIsDeleted(0);
+
+                Executors.newSingleThreadExecutor().execute(() -> {
+                    try {
+                        // Check server baseline for conflict detection
+                        ApiClient.HttpResponse checkRes = ApiClient.getSinglePassword(MainActivity.this, itemToUpdate.getId(), true);
+                        if (checkRes.isSuccess) {
+                            JSONObject serverObj = new JSONObject(checkRes.body);
+                            String serverPlain = serverObj.optString("plain_password", "");
+
+                            // Check if server's current password differs from local pre-edit baseline
+                            if (!serverPlain.isEmpty() && !serverPlain.equals(oldLocalPassword)) {
+                                runOnUiThread(() -> {
+                                    btnSave.setEnabled(true);
+                                    btnSave.setText(R.string.save_and_push);
+                                    showConflictResolutionDialog(itemToUpdate, serverPlain, oldLocalPassword, password, dialog);
+                                });
+                                return;
+                            }
+                        }
+
+                        // No conflict detected: Commit update directly to server
+                        executeServerUpdate(itemToUpdate, dialog, btnSave);
+
+                    } catch (Exception e) {
+                        runOnUiThread(() -> {
+                            btnSave.setEnabled(true);
+                            btnSave.setText(R.string.save_and_push);
+                            Toast.makeText(MainActivity.this, "无法连接服务端: " + e.getMessage() + "\n根据安全策略，必须先成功同步服务端方可保存！", Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
             }
         });
 
         dialog.show();
+    }
+
+    private void executeServerUpdate(PasswordItem item, AlertDialog editDialog, Button btnSave) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                ApiClient.HttpResponse updateRes = ApiClient.updatePassword(MainActivity.this, item);
+                runOnUiThread(() -> {
+                    if (btnSave != null) {
+                        btnSave.setEnabled(true);
+                        btnSave.setText(R.string.save_and_push);
+                    }
+                    if (updateRes.isSuccess) {
+                        // Server update succeeded -> Now save to local database
+                        dbHelper.upsertPassword(item);
+                        loadLocalData();
+                        if (editDialog != null) editDialog.dismiss();
+                        Toast.makeText(MainActivity.this, "修改成功，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                        performSync();
+                    } else {
+                        // Server update rejected/failed -> DO NOT modify local DB
+                        String errMsg = parseErrorMessage(updateRes.body, "服务端更新拒绝");
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("❌ 服务端修改失败")
+                                .setMessage(errMsg + "\n\n根据数据一致性原则，本地未做任何修改。")
+                                .setPositiveButton("我知道了", null)
+                                .show();
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (btnSave != null) {
+                        btnSave.setEnabled(true);
+                        btnSave.setText(R.string.save_and_push);
+                    }
+                    Toast.makeText(MainActivity.this, "修改失败: " + e.getMessage() + " (本地未保存)", Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private void showConflictResolutionDialog(PasswordItem item, String serverPassword, String localOriginalPassword, String newlyEnteredPassword, AlertDialog editDialog) {
+        new AlertDialog.Builder(MainActivity.this)
+                .setTitle("⚠️ 发现服务端与本地密码不一致")
+                .setMessage("检测到服务端当前保存的密码与本地原密码不一致（可能已在其他设备或网页端修改）：\n\n" +
+                        "• 服务端最新密码: " + serverPassword + "\n" +
+                        "• APP本地原密码: " + localOriginalPassword + "\n" +
+                        "• 您刚才输入的新密码: " + newlyEnteredPassword + "\n\n" +
+                        "请选择如何处理此冲突：")
+                .setPositiveButton("以新输入密码覆盖服务端与本地", (d, w) -> {
+                    item.setPassword(newlyEnteredPassword);
+                    executeServerUpdate(item, editDialog, null);
+                })
+                .setNeutralButton("使用服务端密码覆盖本地", (d, w) -> {
+                    item.setPassword(serverPassword);
+                    dbHelper.upsertPassword(item);
+                    loadLocalData();
+                    if (editDialog != null) editDialog.dismiss();
+                    Toast.makeText(MainActivity.this, "已使用服务端密码覆盖并更新本地", Toast.LENGTH_LONG).show();
+                    performSync();
+                })
+                .setNegativeButton("取消修改", null)
+                .setCancelable(false)
+                .show();
+    }
+
+    private String parseErrorMessage(String rawBody, String defaultMsg) {
+        try {
+            JSONObject obj = new JSONObject(rawBody);
+            if (obj.has("error")) return obj.getString("error");
+            if (obj.has("message")) return obj.getString("message");
+        } catch (Exception ignored) {}
+        return (rawBody != null && !rawBody.isEmpty()) ? rawBody : defaultMsg;
     }
 
     private void showSettingsDialog() {
