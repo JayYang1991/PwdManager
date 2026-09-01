@@ -215,6 +215,7 @@ def init_db():
         )
     """)
     cursor.execute("INSERT OR IGNORE INTO key_history (key, created_at) VALUES (?, ?)", (DEFAULT_PRIVATE_KEY, get_iso_now()))
+    cursor.execute("INSERT OR IGNORE INTO key_history (key, created_at) SELECT value, updated_at FROM server_config WHERE key = 'master_private_key'")
 
     cursor.execute("SELECT value FROM server_config WHERE key = 'master_private_key'")
     if not cursor.fetchone():
