@@ -1077,6 +1077,65 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </div>
 </div>
 
+<!-- Modal: Security Audit Logs -->
+<div id="securityLogsModal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 920px; width: 95%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-shield-virus" style="color: var(--accent-pink);"></i> 安全审计日志与风控看板</h3>
+            <button class="icon-btn" onclick="closeModal('securityLogsModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- 3 Stats Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
+            <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-pink);"></i> 累计失败尝试</div>
+                <div style="font-size: 24px; font-weight: 700; color: #FDA4AF; margin-top: 4px;" id="secStatFailed">0</div>
+            </div>
+            <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-network-wired" style="color: var(--accent-cyan);"></i> 异常来源 IP 数</div>
+                <div style="font-size: 24px; font-weight: 700; color: #38BDF8; margin-top: 4px;" id="secStatIps">0</div>
+            </div>
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-sub);"><i class="fa-solid fa-user-lock" style="color: #F59E0B;"></i> 当前封禁目标</div>
+                <div style="font-size: 24px; font-weight: 700; color: #FCD34D; margin-top: 4px;" id="secStatLocked">0</div>
+            </div>
+        </div>
+
+        <!-- Active Lockouts Banner -->
+        <div id="activeLockoutSection" style="display: none; background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent-pink); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 600; color: #FDA4AF; margin-bottom: 8px;"><i class="fa-solid fa-ban"></i> 当前正处于安全锁定中的目标：</div>
+            <div id="activeLockoutList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+        </div>
+
+        <!-- Logs Table -->
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 16px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                <thead style="background: rgba(255,255,255,0.05); position: sticky; top: 0; backdrop-filter: blur(10px);">
+                    <tr>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">时间 (UTC)</th>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">来源 IP</th>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">尝试用户名</th>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">状态</th>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">拦截原因</th>
+                        <th style="padding: 10px 14px; color: var(--text-sub);">客户端特征</th>
+                    </tr>
+                </thead>
+                <tbody id="securityLogsTableBody">
+                    <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-sub);">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="modal-actions" style="justify-content: space-between;">
+            <button class="btn btn-outline" style="border-color: rgba(244,63,94,0.5); color: #FDA4AF;" onclick="clearSecurityLogs()"><i class="fa-solid fa-trash-can"></i> 清空日志</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-outline" onclick="loadSecurityLogs()"><i class="fa-solid fa-arrows-rotate"></i> 刷新</button>
+                <button class="btn btn-primary" onclick="closeModal('securityLogsModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // --- Starfield Particle Animation ---
     const canvas = document.getElementById("starfield");
@@ -1263,7 +1322,6 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         filtered.forEach(r => {
             const card = document.createElement("div");
             card.className = "pwd-card";
-            const plain = r.plain_password || "••••••••";
             card.innerHTML = `
                 <div class="card-header">
                     <div>
@@ -1280,8 +1338,9 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <a href="javascript:void(0)" onclick="copyText('${escapeJs(r.username)}', '账号')" style="color: var(--accent-cyan); text-decoration: none;"><i class="fa-regular fa-copy"></i> 复制</a>
                 </div>
                 <div class="pwd-field">
-                    <span id="pwdText_${r.id}">${escapeHtml(plain)}</span>
-                    <div>
+                    <span id="pwdText_${r.id}" style="letter-spacing: 2px; font-family: monospace;">••••••••</span>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="icon-btn" id="toggleEye_${r.id}" title="显示明文密码" onclick="togglePasswordVisibility('${r.id}')"><i class="fa-solid fa-eye" id="eyeIcon_${r.id}"></i></button>
                         <button class="icon-btn" title="复制密码 (30秒自动清除)" onclick="copyText('${escapeJs(r.plain_password || "")}', '密码')"><i class="fa-solid fa-copy"></i></button>
                     </div>
                 </div>
@@ -1301,6 +1360,27 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         document.getElementById("mPassword").value = "";
         document.getElementById("mNotes").value = "";
         openModal("pwdModal");
+    }
+
+    function togglePasswordVisibility(id) {
+        const item = allRecords.find(r => r.id === id);
+        if (!item) return;
+        const span = document.getElementById("pwdText_" + id);
+        const icon = document.getElementById("eyeIcon_" + id);
+        const btn = document.getElementById("toggleEye_" + id);
+        if (!span || !icon) return;
+
+        if (span.innerText === "••••••••") {
+            span.innerText = item.plain_password || "(空密码)";
+            span.style.letterSpacing = "normal";
+            icon.className = "fa-solid fa-eye-slash";
+            if (btn) btn.title = "隐藏明文密码";
+        } else {
+            span.innerText = "••••••••";
+            span.style.letterSpacing = "2px";
+            icon.className = "fa-solid fa-eye";
+            if (btn) btn.title = "显示明文密码";
+        }
     }
 
     function editPassword(id) {
@@ -1577,7 +1657,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-sub);"><i class="fa-solid fa-spinner fa-spin"></i> 正在加载安全审计日志...</td></tr>`;
 
         try {
-            const res = await apiRequest("/api/admin/security-logs?limit=100");
+            const res = await api("/api/admin/security-logs?limit=100");
             document.getElementById("secStatFailed").innerText = res.total_failed_attempts || 0;
             document.getElementById("secStatIps").innerText = res.distinct_failed_ips || 0;
 
@@ -1643,7 +1723,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
     async function unlockTarget(ip, username) {
         try {
-            await apiRequest("/api/admin/security-logs/unlock", "POST", { ip: ip, username: username });
+            await api("/api/admin/security-logs/unlock", "POST", { ip: ip, username: username });
             showToast("🔓 已成功解除锁定！");
             loadSecurityLogs();
         } catch (e) {
@@ -1654,7 +1734,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     async function clearSecurityLogs() {
         if (!confirm("确定要清空所有历史安全审计与拦截日志吗？")) return;
         try {
-            await apiRequest("/api/admin/security-logs", "DELETE");
+            await api("/api/admin/security-logs", "DELETE");
             showToast("🧹 安全审计日志已清空！");
             loadSecurityLogs();
         } catch (e) {
