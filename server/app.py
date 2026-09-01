@@ -1386,11 +1386,44 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         document.getElementById("rotNewKey").value = str;
     }
 
-    function copyText(text, label = "内容") {
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(`${label}已复制到剪贴板！`);
-        });
+    async function copyText(text, label = "内容") {
+        if (!text) {
+            showToast(`⚠️ ${label}为空，无法复制`, "fa-triangle-exclamation");
+            return;
+        }
+        let copied = false;
+        // 1. Try modern Async Clipboard API (for HTTPS / localhost)
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                copied = true;
+            } catch (err) {
+                console.warn("navigator.clipboard error, fallback to execCommand:", err);
+            }
+        }
+        // 2. Fallback to execCommand (works in HTTP intranet / non-secure contexts)
+        if (!copied) {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.top = "-9999px";
+                textArea.style.left = "-9999px";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                copied = document.execCommand("copy");
+                document.body.removeChild(textArea);
+            } catch (err) {
+                console.error("execCommand copy error:", err);
+            }
+        }
+        if (copied) {
+            showToast(`📋 ${label}已成功复制到剪贴板！`);
+        } else {
+            showToast(`❌ 复制失败，请手动选择复制`, "fa-triangle-exclamation");
+        }
     }
 
     function openModal(id) { document.getElementById(id).style.display = "flex"; }
