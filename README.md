@@ -11,7 +11,7 @@ PwdManager 是一套安全、轻量、高可用的全栈密码管理系统，包
 ### 1. 服务端一键极速安装 (Linux)
 在任意 Linux (Ubuntu / Debian / CentOS) 服务器上直接执行以下命令：
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/dist/install_server.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/install_server.sh | sudo bash
 ```
 > 脚本将自动配置 Python 环境、创建 systemd 系统服务、配置开机自启并启动在端口 `8000`。
 

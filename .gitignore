@@ -1,0 +1,49 @@
+# ==============================================================================
+# Git Ignore Rules for PwdManager
+# ==============================================================================
+
+# Build outputs & packages
+dist/
+/dist/
+*.apk
+*.aab
+*.tar.gz
+*.zip
+*.tar
+
+# Server dynamic downloads & runtime databases
+server/download/
+server/passwords.db*
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+
+# Android & Gradle intermediate build files
+.gradle/
+android/.gradle/
+build/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+*.iml
+.idea/
+.cxx/
+
+# Python intermediate & bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+
+# Screenshots & OS generated files
+screenshots/
+.DS_Store
+Thumbs.db
