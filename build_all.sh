@@ -106,6 +106,7 @@ TEMP_STAGE=$(mktemp -d)
 mkdir -p "$TEMP_STAGE/pwdmanager-server/download"
 cp "$PROJECT_ROOT/server/app.py" "$TEMP_STAGE/pwdmanager-server/"
 cp "$PROJECT_ROOT/server/install.sh" "$TEMP_STAGE/pwdmanager-server/"
+cp "$PROJECT_ROOT/server/uninstall.sh" "$TEMP_STAGE/pwdmanager-server/" 2>/dev/null || true
 cp "$APK_DEST" "$TEMP_STAGE/pwdmanager-server/download/PwdManager.apk"
 
 cat << 'README_EOF' > "$TEMP_STAGE/pwdmanager-server/README.md"
@@ -137,8 +138,9 @@ echo "  ✅ 服务端安装包打包完成: $SERVER_TAR ($(du -h "$SERVER_TAR" |
 echo ""
 echo "[3/4] 准备独立一键安装脚本 (dist/install_server.sh)..."
 cp "$PROJECT_ROOT/install_server.sh" "$DIST_DIR/install_server.sh"
-chmod +x "$DIST_DIR/install_server.sh"
-echo "  ✅ 独立安装脚本就绪: $DIST_DIR/install_server.sh"
+cp "$PROJECT_ROOT/uninstall_server.sh" "$DIST_DIR/uninstall_server.sh" 2>/dev/null || true
+chmod +x "$DIST_DIR/install_server.sh" "$DIST_DIR/uninstall_server.sh" 2>/dev/null || true
+echo "  ✅ 独立安装/卸载脚本就绪: $DIST_DIR/install_server.sh, $DIST_DIR/uninstall_server.sh"
 
 # ------------------------------------------------------------------------------
 # 4. 推送到 GitHub Release (若开启 --release)

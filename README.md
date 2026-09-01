@@ -21,7 +21,15 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/install
 
 ---
 
-### 2. 安卓客户端 (APP) 下载与使用
+### 2. 服务端一键完全卸载与清理 (Linux)
+若需卸载服务端及清理所有数据，执行：
+```bash
+curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/uninstall_server.sh | sudo bash
+```
+
+---
+
+### 3. 安卓客户端 (APP) 下载与使用
 - **方式一（服务端网页直接下载）**：在浏览器打开 `http://<服务器IP>:8000/download/app.apk`
 - **方式二（GitHub Release 下载）**：从 [Releases 页面](https://github.com/JayYang1991/PwdManager/releases) 下载最新的 `PwdManager.apk`
 
@@ -32,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/install
 
 ---
 
-### 3. 本地一键编译、打包与推送到 GitHub Release
+### 4. 本地一键编译、打包与推送到 GitHub Release
 ```bash
 # 仅本地编译打包 Android APK 与服务端安装包 (输出至 dist/)
 ./build_all.sh
