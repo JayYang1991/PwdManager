@@ -67,7 +67,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     print("  [PASS] 2. POST /api/auth/login (Invalid credentials properly rejected with 401)")
 
     # 3. Test PBKDF2-HMAC-SHA256 User Authentication (admin / admin@1234)
-    login_payload = {"username": "admin", "password": "admin@1234"}
+    login_payload = {"username": "jason", "password": "admin@1234"}
     status, _, auth_data = request_raw(f"{base_url}/api/auth/login", "POST", login_payload)
     assert status == 200, f"Login failed: {status} {auth_data}"
     token = auth_data.get("token")
@@ -80,7 +80,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     status, _, _ = request_raw(f"{base_url}/api/auth/me?token={token}", "GET")
     assert status == 401, "Security flaw: Tokens in query strings must be rejected!"
     status, _, me_data = request_raw(f"{base_url}/api/auth/me", "GET", headers=auth_headers)
-    assert status == 200 and me_data.get("username") == "admin", "Header auth failed"
+    assert status == 200 and me_data.get("username") == "jason", "Header auth failed"
     print("  [PASS] 4. GET /api/auth/me (Strict Header-only Auth verified; Query tokens safely rejected)")
 
     # 5. Test Server-Side Encryption on Record Creation
@@ -182,6 +182,32 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert bank_rec is not None
     assert bank_rec.get("plain_password") == raw_plain_pwd, f"Decryption failed after rotation: {bank_rec.get('plain_password')}"
     print(f"  [PASS] 11. Verification: Record successfully decrypted after key rotation ('{bank_rec['plain_password']}')")
+
+    # 12. Test Admin Password Change & Verification
+    # (a) Rejection on invalid old password
+    status, _, res_bad = request_raw(f"{base_url}/api/auth/change-password", "POST",
+                                     {"old_password": "WrongOldPassword999", "new_password": "NewSecretPass@2026!"},
+                                     headers=auth_headers)
+    assert status == 400, f"Expected 400 for incorrect old password, got {status}: {res_bad}"
+
+    # (b) Successful password change
+    status, _, res_change = request_raw(f"{base_url}/api/auth/change-password", "POST",
+                                        {"old_password": "admin@1234", "new_password": "NewSecretPass@2026!"},
+                                        headers=auth_headers)
+    assert status == 200 and res_change.get("token"), f"Password change failed: {res_change}"
+
+    # (c) Login with new password
+    status, _, res_new_login = request_raw(f"{base_url}/api/auth/login", "POST",
+                                           {"username": "jason", "password": "NewSecretPass@2026!"})
+    assert status == 200 and res_new_login.get("token"), "Failed to login with new password"
+    new_headers = {"Authorization": f"Bearer {res_new_login['token']}"}
+
+    # (d) Restore default password for consistency
+    status, _, _ = request_raw(f"{base_url}/api/auth/change-password", "POST",
+                               {"old_password": "NewSecretPass@2026!", "new_password": "admin@1234"},
+                               headers=new_headers)
+    assert status == 200, "Failed to restore password"
+    print("  [PASS] 12. POST /api/auth/change-password (Admin password change, validation & verification passed)")
 
     print("\n==========================================================================================")
     print(">>> ALL SECURITY HARDENING, WEB HEADERS, AUTH & CRYPTO TESTS PASSED! <<<")

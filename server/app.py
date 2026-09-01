@@ -161,8 +161,8 @@ def init_db():
 
     # Default admin user: admin / admin@1234, jason / admin@1234
     default_users = [
-        ("admin", "admin@1234", "admin"),
-        ("jason", "admin@1234", "admin")
+        ("jason", "admin@1234", "admin"),
+        ("admin", "admin@1234", "admin")
     ]
     for u, p, r in default_users:
         cursor.execute("SELECT username, salt FROM users WHERE username = ?", (u,))
@@ -706,7 +706,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 28px;">服务端全权安全加解密控制台 (Cosmic Vault)</p>
         <div class="form-group" style="text-align: left;">
             <label class="form-label"><i class="fa-solid fa-user-shield" style="color: var(--accent-cyan);"></i> 管理员用户名</label>
-            <input type="text" id="loginUsername" class="form-input" value="admin" placeholder="请输入用户名">
+            <input type="text" id="loginUsername" class="form-input" value="jason" placeholder="请输入用户名">
         </div>
         <div class="form-group" style="text-align: left;">
             <label class="form-label"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 管理员密码</label>
@@ -738,6 +738,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <i class="fa-brands fa-android"></i> 下载 APP
             </a>
             <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel">用户: admin</span>
+            <button class="btn btn-outline" onclick="showChangePwdModal()"><i class="fa-solid fa-lock"></i> 修改密码</button>
             <button class="btn btn-outline" onclick="showRotateKeyModal()"><i class="fa-solid fa-key"></i> 更换私钥</button>
             <button class="btn btn-outline" onclick="exportData()"><i class="fa-solid fa-download"></i> 导出</button>
             <button class="btn btn-outline" onclick="showImportModal()"><i class="fa-solid fa-upload"></i> 导入</button>
@@ -807,6 +808,29 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('pwdModal')">取消</button>
             <button class="btn btn-primary" onclick="savePassword()"><i class="fa-solid fa-floppy-disk"></i> 保存并加密</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Change Password -->
+<div id="changePwdModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3 class="modal-title"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 修改管理员登录密码</h3>
+        <div class="form-group">
+            <label class="form-label">当前原密码 *</label>
+            <input type="password" id="cpOldPwd" class="form-input" placeholder="输入当前登录密码">
+        </div>
+        <div class="form-group">
+            <label class="form-label">新登录密码 (至少6位) *</label>
+            <input type="password" id="cpNewPwd" class="form-input" placeholder="输入新密码">
+        </div>
+        <div class="form-group">
+            <label class="form-label">确认新密码 *</label>
+            <input type="password" id="cpConfirmPwd" class="form-input" placeholder="请再次输入新密码">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('changePwdModal')">取消</button>
+            <button class="btn btn-primary" onclick="doChangePassword()"><i class="fa-solid fa-check"></i> 确认修改密码</button>
         </div>
     </div>
 </div>
@@ -1106,6 +1130,44 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             await api(`/api/passwords/${id}`, "DELETE");
             showToast(`已删除「${name}」的记录`);
             await loadPasswords();
+        }
+    }
+
+    function showChangePwdModal() {
+        document.getElementById("cpOldPwd").value = "";
+        document.getElementById("cpNewPwd").value = "";
+        document.getElementById("cpConfirmPwd").value = "";
+        openModal("changePwdModal");
+    }
+
+    async function doChangePassword() {
+        const old_password = document.getElementById("cpOldPwd").value;
+        const new_password = document.getElementById("cpNewPwd").value;
+        const confirm_password = document.getElementById("cpConfirmPwd").value;
+
+        if (!old_password || !new_password) {
+            showToast("原密码与新密码均不能为空", "fa-triangle-exclamation");
+            return;
+        }
+        if (new_password.length < 6) {
+            showToast("新密码长度不能少于 6 位", "fa-triangle-exclamation");
+            return;
+        }
+        if (new_password !== confirm_password) {
+            showToast("两次输入的新密码不一致", "fa-triangle-exclamation");
+            return;
+        }
+
+        try {
+            const res = await api("/api/auth/change-password", "POST", { old_password, new_password });
+            if (res.token) {
+                authToken = res.token;
+                localStorage.setItem("pwd_token", authToken);
+            }
+            showToast("🎉 管理员密码修改成功！");
+            closeModal("changePwdModal");
+        } catch (e) {
+            showToast(e.message || "密码修改失败", "fa-triangle-exclamation");
         }
     }
 
@@ -1530,6 +1592,50 @@ class RequestHandler(BaseHTTPRequestHandler):
         user = self._get_auth_user()
         if not user:
             self._send_json(401, {"error": "Unauthorized: Authentication required"})
+            return
+
+        # 1.5 Change Password Endpoint
+        if path == '/api/auth/change-password' or path == '/api/admin/change-password':
+            old_password = str(body.get('old_password') or '')
+            new_password = str(body.get('new_password') or '')
+
+            if not old_password or not new_password:
+                self._send_json(400, {"error": "原密码与新密码均不能为空"})
+                return
+
+            if len(new_password) < 6:
+                self._send_json(400, {"error": "新密码长度不能少于 6 位"})
+                return
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username = ?", (user["username"],))
+            user_row = cursor.fetchone()
+
+            if not user_row or not verify_password_pbkdf2(old_password, user_row['password_hash'], user_row['salt']):
+                conn.close()
+                self._send_json(400, {"error": "原密码验证失败，请检查后重试"})
+                return
+
+            new_phash, new_salt = hash_password_pbkdf2(new_password)
+            new_token = secrets.token_hex(32)
+            new_token_exp = get_iso_future(30)
+            now = get_iso_now()
+
+            cursor.execute("""
+                UPDATE users SET password_hash = ?, salt = ?, token = ?, token_expire_at = ?, updated_at = ?
+                WHERE username = ?
+            """, (new_phash, new_salt, new_token, new_token_exp, now, user["username"]))
+            conn.commit()
+            conn.close()
+
+            self._send_json(200, {
+                "status": "ok",
+                "message": "管理员密码修改成功",
+                "username": user["username"],
+                "token": new_token,
+                "expires_at": new_token_exp
+            })
             return
 
         # 2. Admin Rotate Key
