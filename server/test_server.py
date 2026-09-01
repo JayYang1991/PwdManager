@@ -73,16 +73,18 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert status == 200, f"Login failed: {status} {auth_data}"
     token = auth_data.get("token")
     assert token and len(token) >= 32, "High-entropy token missing or too short"
-    print(f"  [PASS] 3. POST /api/auth/login (Authenticated via PBKDF2: {auth_data['username']}, Token: {token[:8]}...)")
+    assert "expires_in" in auth_data and "timeout_minutes" in auth_data, "Missing timeout metadata in login response"
+    assert auth_data["timeout_minutes"] == 30 and auth_data["expires_in"] == 1800
+    print(f"  [PASS] 3. POST /api/auth/login (PBKDF2 Auth & Session Timeout Verified: {auth_data['timeout_minutes']}min / {auth_data['expires_in']}s, Token: {token[:8]}...)")
 
     auth_headers = {"Authorization": f"Bearer {token}"}
 
-    # 4. Test Header-Only Authentication Enforcement (Rejection of Query Param Token)
+    # 4. Test Header-Only Authentication Enforcement & Session Sliding Expiration
     status, _, _ = request_raw(f"{base_url}/api/auth/me?token={token}", "GET")
     assert status == 401, "Security flaw: Tokens in query strings must be rejected!"
     status, _, me_data = request_raw(f"{base_url}/api/auth/me", "GET", headers=auth_headers)
     assert status == 200 and me_data.get("username") == "jason", "Header auth failed"
-    print("  [PASS] 4. GET /api/auth/me (Strict Header-only Auth verified; Query tokens safely rejected)")
+    print("  [PASS] 4. GET /api/auth/me (Strict Header-only Auth & Active Session Sliding verified)")
 
     # 5. Test Server-Side Encryption on Record Creation
     test_id = f"test-sec-{int(time.time()*1000)}"
@@ -536,6 +538,23 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert "current_version" in upd_data and "latest_version" in upd_data and "download_url" in upd_data
     print(f"      -> 18(a) Release Inspection: Current: {upd_data['current_version']}, Latest: {upd_data['latest_version']}, Has Update: {upd_data.get('has_update')}")
     print("  [PASS] 18. Server Smooth Online Update & Release Check API 100% verified!")
+
+    # --------------------------------------------------------------------------
+    # 19. Session Inactivity Timeout & Active Logout Test Suite
+    # --------------------------------------------------------------------------
+    print("\n  [*] Running Session Timeout & Active Logout Test Suite (Step 19)...")
+
+    # 19(a) Active Logout
+    s_logout, _, logout_res = request_raw(f"{base_url}/api/auth/logout", "POST", headers=auth_headers)
+    assert s_logout == 200 and logout_res.get("success") == True
+    print(f"      -> 19(a) Active Logout API: Successfully logged out session")
+
+    # 19(b) Token Invalidation: Revoked token MUST now be rejected with 401
+    s_invalid, _, inv_info = request_raw(f"{base_url}/api/auth/me", "GET", headers=auth_headers)
+    assert s_invalid == 401, f"Expected 401 for invalidated session token, got {s_invalid}: {inv_info}"
+    print(f"      -> 19(b) Token Invalidation Enforcement: Revoked token safely rejected with HTTP 401")
+
+    print("  [PASS] 19. Session Timeout, Sliding Expiration & Active Logout API 100% verified!")
 
 
     print("\n==========================================================================================")

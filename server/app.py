@@ -170,11 +170,17 @@ def record_security_log(ip: str, username: str, user_agent: str, status: str, fa
     except Exception as e:
         print(f"[-] Failed to record security audit log: {e}")
 
+# Session Timeout Configuration (Inactivity expiration in minutes)
+SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "30"))
+
 def get_iso_now():
     return datetime.now(timezone.utc).isoformat()
 
 def get_iso_future(days=30):
     return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+
+def get_iso_future_minutes(minutes=30):
+    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
 
 def hash_password_pbkdf2(password: str, salt: bytes = None) -> tuple:
     """PBKDF2-HMAC-SHA256 with 100,000 iterations and 16-byte random salt"""
@@ -461,13 +467,25 @@ def authenticate_token(token: str):
     cursor = conn.cursor()
     cursor.execute("SELECT username, role, token_expire_at FROM users WHERE token = ?", (token,))
     row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    
+    exp = row["token_expire_at"]
+    now_iso = get_iso_now()
+    if exp and exp < now_iso:
+        conn.close()
+        return None  # Token Expired
+    
+    # Sliding Activity Expiration: Automatically extend active session by SESSION_TIMEOUT_MINUTES
+    try:
+        new_exp = get_iso_future_minutes(SESSION_TIMEOUT_MINUTES)
+        cursor.execute("UPDATE users SET token_expire_at = ? WHERE token = ?", (new_exp, token))
+        conn.commit()
+    except Exception:
+        pass
     conn.close()
-    if row:
-        exp = row["token_expire_at"]
-        if exp and exp < get_iso_now():
-            return None  # Token Expired
-        return {"username": row["username"], "role": row["role"]}
-    return None
+    return {"username": row["username"], "role": row["role"]}
 
 WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1688,6 +1706,30 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     let allRecords = [];
     let currentGlobalVersion = 0;
     let currentKey = "";
+    
+    // Inactivity Session Timeout Config (30 minutes default)
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+    let inactivityTimer = null;
+
+    function resetInactivityTimer() {
+        if (!authToken) return;
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            handleSessionTimeout();
+        }, SESSION_TIMEOUT_MS);
+    }
+
+    function handleSessionTimeout() {
+        if (!authToken) return;
+        doLogout(true, "⏰ 由于您长时间未进行任何操作，登录会话已安全超时退出，请重新登录。");
+    }
+
+    // Attach user activity listeners across DOM
+    ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'].forEach(evt => {
+        window.addEventListener(evt, () => {
+            resetInactivityTimer();
+        }, { passive: true });
+    });
 
     async function api(path, method = "GET", data = null) {
         const headers = { "Content-Type": "application/json" };
@@ -1700,7 +1742,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (res.status === 401) {
             const errData = await res.json().catch(() => ({}));
             if (path !== "/api/auth/login" && path !== "/api/admin/login") {
-                doLogout();
+                doLogout(true, "⏰ 登录会话已超时或失效，请重新登录。");
             }
             throw new Error(errData.error || "用户名或密码错误，请检查");
         }
@@ -1726,18 +1768,43 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             localStorage.setItem("pwd_token", authToken);
             document.getElementById("currentUserLabel").innerText = "用户: " + res.username;
             document.getElementById("drawerUserLabel").innerText = "用户: " + res.username;
+            document.getElementById("loginMsg").innerText = "";
             showToast("登录成功，欢迎进入星空密码控制台！");
+            resetInactivityTimer();
             initApp();
         } catch (e) {
             document.getElementById("loginMsg").innerText = "登录失败: " + e.message;
         }
     }
 
-    function doLogout() {
+    async function doLogout(isTimeout = false, reason = "") {
+        if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = null;
+        }
+        const oldToken = authToken;
         authToken = "";
         localStorage.removeItem("pwd_token");
         document.getElementById("loginSection").style.display = "flex";
         document.getElementById("appSection").style.display = "none";
+        closeDrawer();
+
+        if (isTimeout) {
+            const msg = reason || "⏰ 登录会话已超时，请重新登录。";
+            document.getElementById("loginMsg").innerText = msg;
+            showToast(msg, "fa-clock");
+        } else {
+            document.getElementById("loginMsg").innerText = "";
+            showToast("已安全退出登录", "fa-right-from-bracket");
+            if (oldToken) {
+                try {
+                    await fetch("/api/auth/logout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + oldToken }
+                    });
+                } catch (ignored) {}
+            }
+        }
     }
 
     async function initApp() {
@@ -1745,8 +1812,9 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             const me = await api("/api/auth/me");
             document.getElementById("currentUserLabel").innerText = "用户: " + me.username;
             document.getElementById("drawerUserLabel").innerText = "用户: " + me.username;
+            resetInactivityTimer();
         } catch (e) {
-            doLogout();
+            doLogout(true, "⏰ 登录会话已过期，请重新登录。");
             return;
         }
         document.getElementById("loginSection").style.display = "none";
@@ -2377,10 +2445,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         if content_length > MAX_REQUEST_BODY_SIZE:
             raise ValueError(f"Payload exceeds maximum allowed limit ({MAX_REQUEST_BODY_SIZE} bytes)")
 
+        if content_length == 0:
+            return {}
         body = self.rfile.read(content_length)
         if len(body) != content_length:
             raise ValueError("Request body truncated or incomplete")
-        return json.loads(body.decode('utf-8'))
+        raw_str = body.decode('utf-8').strip()
+        if not raw_str:
+            return {}
+        return json.loads(raw_str)
 
     def _get_client_ip(self):
         peer_ip = self.client_address[0]
@@ -2677,12 +2750,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         client_ip = self._get_client_ip()
+        user_agent = self.headers.get('User-Agent', '')
 
         # 1. User & Admin Login (Dual-Dimension Anti-Brute-Force & Timing Attack Shield)
         if path == '/api/auth/login' or path == '/api/admin/login':
             username = (body.get('username') or body.get('user') or '').strip()
             password = str(body.get('password') or body.get('admin_secret') or '')
-            user_agent = self.headers.get('User-Agent', '')
 
             # Check IP and Username rate limits
             is_locked, retry_after, lock_msg = check_rate_limit(client_ip, username)
@@ -2724,7 +2797,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 clear_failed_attempts(client_ip, username)
                 record_security_log(client_ip, username, user_agent, "SUCCESS", "登录成功")
                 token = secrets.token_hex(32)
-                token_exp = get_iso_future(30)
+                token_exp = get_iso_future_minutes(SESSION_TIMEOUT_MINUTES)
                 cursor.execute("UPDATE users SET token = ?, token_expire_at = ?, updated_at = ? WHERE username = ?",
                                (token, token_exp, get_iso_now(), user_row['username']))
                 conn.commit()
@@ -2734,6 +2807,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                     "username": user_row['username'],
                     "role": user_row['role'],
                     "token": token,
+                    "expires_in": SESSION_TIMEOUT_MINUTES * 60,
+                    "timeout_minutes": SESSION_TIMEOUT_MINUTES,
                     "expires_at": token_exp
                 })
             else:
@@ -2750,6 +2825,20 @@ class RequestHandler(BaseHTTPRequestHandler):
                     "remaining_attempts": remaining,
                     "code": "INVALID_CREDENTIALS"
                 })
+            return
+
+        # 1.4 Logout Endpoint (Invalidate Session Token on Server)
+        if path == '/api/auth/logout' or path == '/api/admin/logout':
+            auth_user = self._get_auth_user()
+            if auth_user:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET token = '', token_expire_at = '', updated_at = ? WHERE username = ?",
+                               (get_iso_now(), auth_user["username"]))
+                conn.commit()
+                conn.close()
+                record_security_log(client_ip, auth_user["username"], user_agent, "LOGOUT", "主动安全退出登录")
+            self._send_json(200, {"success": True, "message": "已安全退出登录"})
             return
 
         user = self._get_auth_user()
