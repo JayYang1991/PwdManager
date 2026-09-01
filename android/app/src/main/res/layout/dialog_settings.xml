@@ -14,19 +14,28 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="服务端连接与鉴权配置"
+            android:text="服务端连接与安全控制中心"
             android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
 
-        <!-- Server Domain / URL -->
+        <!-- Section 1: Connection & Auth -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🌐 服务端连接与登录配置"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="服务器域名 / IP地址"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="10dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etServerUrl"
@@ -37,13 +46,12 @@
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Username -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="用户名 (Username)"
+            android:hint="管理员用户名"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="10dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etServerUser"
@@ -54,14 +62,13 @@
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Password -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="密码 (Password)"
+            android:hint="管理员密码"
             app:endIconMode="password_toggle"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="14dp">
+            android:layout_marginBottom="10dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etServerPass"
@@ -72,13 +79,12 @@
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Test Connection & Login Button -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="18dp">
+            android:layout_marginBottom="16dp">
 
             <Button
                 android:id="@+id/btnTestConnection"
@@ -92,11 +98,103 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:textSize="13sp"
+                android:layout_marginStart="10dp"
+                android:textSize="12sp"
                 android:textColor="@color/text_secondary" />
         </LinearLayout>
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section 2: Security & Admin Management -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🛡️ 管理员安全与私钥管理"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <Button
+                android:id="@+id/btnOpenChangePassword"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔑 修改密码"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnOpenMasterKey"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔒 查看主私钥"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section 3: Backup, Restore & Key Rotation -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📦 数据灾备、导入导出与密钥轮换"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <Button
+                android:id="@+id/btnExportBackup"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📤 导出备份"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnOpenImport"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📥 恢复导入"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnOpenRotateKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔄 一键更换主加密私钥 (密钥轮换)"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:textColor="@color/primary_dark"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Save and Cancel Actions -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -115,7 +213,7 @@
                 android:id="@+id/btnSettingsSave"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="保存并登录同步"
+                android:text="保存配置并同步"
                 android:backgroundTint="@color/primary"
                 android:textColor="#FFFFFF" />
 

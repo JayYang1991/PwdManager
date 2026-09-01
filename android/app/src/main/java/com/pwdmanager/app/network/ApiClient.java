@@ -2,6 +2,7 @@ package com.pwdmanager.app.network;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -158,7 +159,67 @@ public class ApiClient {
             }
         }
 
-        conn.disconnect();
         return new HttpResponse(responseCode, sb.toString());
+    }
+
+    // --- Admin Feature APIs ---
+
+    public static HttpResponse changeAdminPassword(Context context, String oldPassword, String newPassword) throws Exception {
+        String url = getServerUrl(context) + "/api/auth/change-password";
+        JSONObject body = new JSONObject();
+        body.put("old_password", oldPassword);
+        body.put("new_password", newPassword);
+        HttpResponse res = authenticatedRequest(context, url, "POST", body);
+        if (res.isSuccess) {
+            JSONObject obj = new JSONObject(res.body);
+            if (obj.has("token")) {
+                setAuthToken(context, obj.getString("token"));
+            }
+            setPassword(context, newPassword);
+        }
+        return res;
+    }
+
+    public static HttpResponse getMasterKey(Context context) throws Exception {
+        String url = getServerUrl(context) + "/api/admin/key";
+        return authenticatedRequest(context, url, "GET", null);
+    }
+
+    public static HttpResponse rotateMasterKey(Context context, String oldKey, String newKey, boolean reencrypt) throws Exception {
+        String url = getServerUrl(context) + "/api/admin/rotate-key";
+        JSONObject body = new JSONObject();
+        body.put("old_key", oldKey);
+        body.put("new_key", newKey);
+        body.put("reencrypt_records", reencrypt);
+        return authenticatedRequest(context, url, "POST", body);
+    }
+
+    public static HttpResponse exportBackup(Context context) throws Exception {
+        String url = getServerUrl(context) + "/api/admin/export";
+        return authenticatedRequest(context, url, "GET", null);
+    }
+
+    public static HttpResponse importBackup(Context context, String customPrivateKey, String rawJsonData) throws Exception {
+        String url = getServerUrl(context) + "/api/admin/import";
+        JSONObject payload = new JSONObject();
+        if (rawJsonData.trim().startsWith("{")) {
+            JSONObject parsed = new JSONObject(rawJsonData);
+            if (customPrivateKey != null && !customPrivateKey.trim().isEmpty()) {
+                payload.put("private_key", customPrivateKey.trim());
+            } else if (parsed.has("private_key")) {
+                payload.put("private_key", parsed.getString("private_key"));
+            }
+            if (parsed.has("records")) {
+                payload.put("records", parsed.getJSONArray("records"));
+            }
+        } else if (rawJsonData.trim().startsWith("[")) {
+            if (customPrivateKey != null && !customPrivateKey.trim().isEmpty()) {
+                payload.put("private_key", customPrivateKey.trim());
+            }
+            payload.put("records", new JSONArray(rawJsonData));
+        } else {
+            throw new IllegalArgumentException("请输入合法的 JSON 格式备份数据");
+        }
+        return authenticatedRequest(context, url, "POST", payload);
     }
 }

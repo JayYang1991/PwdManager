@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="主加密密钥轮换 (Key Rotation)"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="更换服务端 AES-256-GCM 主加密私钥，并自动对所有存量密码记录使用新私钥执行重加密与完整性保护。"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Old Master Key -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="当前主私钥 (自动获取)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etRotOldKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- New Master Key -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="新主加密私钥"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etRotNewKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/btnGenRotateKey"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎲 生成随机高强度新私钥"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginBottom="14dp" />
+
+        <CheckBox
+            android:id="@+id/cbReencryptRecords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="自动解密存量数据并使用新私钥重新加密 (推荐)"
+            android:checked="true"
+            android:textSize="13sp"
+            android:layout_marginBottom="18dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/btnRotCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnRotSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="立即轮换私钥"
+                android:backgroundTint="@color/primary"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

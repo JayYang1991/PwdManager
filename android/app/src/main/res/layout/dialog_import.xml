@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="数据恢复与导入 (Import Backup)"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="从导出的 JSON 备份数据中恢复密码记录与私钥。若导入包含 private_key，服务端将自动更新并适配。"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Optional Custom Master Key -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="指定主私钥 (选填，留空则沿用备份中私钥)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etImpKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- JSON Data -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="粘贴 JSON 备份数据"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="18dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etImpJson"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/btnImpCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnImpSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="确认导入恢复"
+                android:backgroundTint="@color/primary"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

@@ -3,6 +3,8 @@ package com.pwdmanager.app.ui;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,9 +28,9 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     }
 
     private final Context context;
+    private final OnItemActionListener listener;
     private final List<PasswordItem> items = new ArrayList<>();
     private final Set<String> revealedPasswordIds = new HashSet<>();
-    private final OnItemActionListener listener;
 
     public PasswordAdapter(Context context, OnItemActionListener listener) {
         this.context = context;
@@ -37,7 +39,6 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
 
     public void updateData(List<PasswordItem> newItems) {
         items.clear();
-        revealedPasswordIds.clear();
         if (newItems != null) {
             items.addAll(newItems);
         }
@@ -47,7 +48,7 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_password, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.item_password, parent, false);
         return new ViewHolder(view);
     }
 
@@ -56,10 +57,22 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
         PasswordItem item = items.get(position);
 
         holder.tvName.setText(item.getName());
-        
-        if (item.getUrl() != null && !item.getUrl().isEmpty()) {
+
+        if (item.getUrl() != null && !item.getUrl().trim().isEmpty()) {
             holder.tvUrl.setVisibility(View.VISIBLE);
             holder.tvUrl.setText(item.getUrl());
+            holder.tvUrl.setOnClickListener(v -> {
+                try {
+                    String u = item.getUrl().trim();
+                    if (!u.startsWith("http://") && !u.startsWith("https://")) {
+                        u = "https://" + u;
+                    }
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(u));
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(context, "无法打开网址: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
         } else {
             holder.tvUrl.setVisibility(View.GONE);
         }
