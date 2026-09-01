@@ -18,6 +18,7 @@ Features:
 
 import json
 import os
+import threading
 import sqlite3
 import sys
 import hashlib
@@ -53,10 +54,80 @@ DB_PATH = os.environ.get("PWD_DB_PATH", os.path.join(BASE_DIR, "passwords.db"))
 DOWNLOAD_DIR = os.environ.get("PWD_DOWNLOAD_DIR", os.path.join(BASE_DIR, "download"))
 DEFAULT_PRIVATE_KEY = os.environ.get("MASTER_PRIVATE_KEY", "PwdManager#MasterSecretKey2026AES256")
 
-# Rate Limiter: IP -> [timestamps of failed attempts]
-FAILED_ATTEMPTS = defaultdict(list)
-LOCKOUT_DURATION = 300  # 5 minutes
+# ==============================================================================
+# 🛡️ Dual-Dimension Anti-Brute-Force Engine (IP + Account Level Protection)
+# ==============================================================================
+RATE_LIMIT_LOCK = threading.Lock()
+FAILED_ATTEMPTS_IP = defaultdict(list)
+FAILED_ATTEMPTS_USER = defaultdict(list)
+LOCKOUT_DURATION = 300  # 5 minutes in seconds
 MAX_FAILED_ATTEMPTS = 5
+
+def check_rate_limit(client_ip: str, username: str = None) -> tuple:
+    """
+    Check if IP or Account (username) is currently locked out.
+    Returns (is_locked: bool, retry_after_seconds: int, lock_reason: str)
+    """
+    now = time.time()
+    with RATE_LIMIT_LOCK:
+        # 1. Clean & check IP records
+        ip_attempts = [t for t in FAILED_ATTEMPTS_IP[client_ip] if now - t < LOCKOUT_DURATION]
+        FAILED_ATTEMPTS_IP[client_ip] = ip_attempts
+
+        if len(ip_attempts) >= MAX_FAILED_ATTEMPTS:
+            oldest_relevant = ip_attempts[-MAX_FAILED_ATTEMPTS]
+            retry_after = max(1, int(LOCKOUT_DURATION - (now - oldest_relevant)))
+            return True, retry_after, f"当前 IP 连续尝试失败已达 {MAX_FAILED_ATTEMPTS} 次，已触发安全锁定，请 {retry_after} 秒后再试。"
+
+        # 2. Clean & check Username records if specified
+        if username:
+            u_key = username.strip().lower()
+            user_attempts = [t for t in FAILED_ATTEMPTS_USER[u_key] if now - t < LOCKOUT_DURATION]
+            FAILED_ATTEMPTS_USER[u_key] = user_attempts
+
+            if len(user_attempts) >= MAX_FAILED_ATTEMPTS:
+                oldest_relevant = user_attempts[-MAX_FAILED_ATTEMPTS]
+                retry_after = max(1, int(LOCKOUT_DURATION - (now - oldest_relevant)))
+                return True, retry_after, f"账号 '{username}' 连续登录失败超过 {MAX_FAILED_ATTEMPTS} 次，已触发临时安全保护锁定，请 {retry_after} 秒后再试。"
+
+        # 3. Periodic memory garbage collection
+        if len(FAILED_ATTEMPTS_IP) > 500:
+            stale_ips = [ip for ip, atts in FAILED_ATTEMPTS_IP.items() if not atts or now - atts[-1] >= LOCKOUT_DURATION]
+            for ip in stale_ips:
+                FAILED_ATTEMPTS_IP.pop(ip, None)
+        if len(FAILED_ATTEMPTS_USER) > 500:
+            stale_users = [u for u, atts in FAILED_ATTEMPTS_USER.items() if not atts or now - atts[-1] >= LOCKOUT_DURATION]
+            for u in stale_users:
+                FAILED_ATTEMPTS_USER.pop(u, None)
+
+        return False, 0, ""
+
+def record_failed_attempt(client_ip: str, username: str = None) -> int:
+    """
+    Record a failed login attempt for both IP and username.
+    Returns the number of remaining attempts before lockout.
+    """
+    now = time.time()
+    with RATE_LIMIT_LOCK:
+        FAILED_ATTEMPTS_IP[client_ip].append(now)
+        ip_count = len([t for t in FAILED_ATTEMPTS_IP[client_ip] if now - t < LOCKOUT_DURATION])
+
+        user_count = 0
+        if username:
+            u_key = username.strip().lower()
+            FAILED_ATTEMPTS_USER[u_key].append(now)
+            user_count = len([t for t in FAILED_ATTEMPTS_USER[u_key] if now - t < LOCKOUT_DURATION])
+
+        max_used = max(ip_count, user_count)
+        remaining = max(0, MAX_FAILED_ATTEMPTS - max_used)
+        return remaining
+
+def clear_failed_attempts(client_ip: str, username: str = None):
+    """Clear failed attempt history upon successful authentication."""
+    with RATE_LIMIT_LOCK:
+        FAILED_ATTEMPTS_IP.pop(client_ip, None)
+        if username:
+            FAILED_ATTEMPTS_USER.pop(username.strip().lower(), None)
 
 def get_iso_now():
     return datetime.now(timezone.utc).isoformat()
@@ -119,24 +190,7 @@ def decrypt_password_server(cipher_b64: str, iv_b64: str, salt_b64: str, master_
     except Exception as e:
         return f"[解密失败: {e}]"
 
-def is_rate_limited(client_ip: str) -> bool:
-    now = time.time()
-    # Filter attempts within lockout window
-    attempts = [t for t in FAILED_ATTEMPTS[client_ip] if now - t < LOCKOUT_DURATION]
-    FAILED_ATTEMPTS[client_ip] = attempts
-    # Periodic memory pruning if dictionary size exceeds threshold
-    if len(FAILED_ATTEMPTS) > 500:
-        stale_keys = [ip for ip, atts in FAILED_ATTEMPTS.items() if not atts or now - atts[-1] >= LOCKOUT_DURATION]
-        for ip in stale_keys:
-            FAILED_ATTEMPTS.pop(ip, None)
-    return len(attempts) >= MAX_FAILED_ATTEMPTS
-
-def record_failed_attempt(client_ip: str):
-    FAILED_ATTEMPTS[client_ip].append(time.time())
-
-def clear_failed_attempts(client_ip: str):
-    if client_ip in FAILED_ATTEMPTS:
-        del FAILED_ATTEMPTS[client_ip]
+# Legacy rate limiter replaced by dual-dimension engine
 
 def init_db():
     db_dir = os.path.dirname(DB_PATH)
@@ -1060,17 +1114,21 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             body: data ? JSON.stringify(data) : null
         });
         if (res.status === 401) {
-            doLogout();
-            throw new Error("认证失败或已过期，请重新登录");
+            const errData = await res.json().catch(() => ({}));
+            if (path !== "/api/auth/login" && path !== "/api/admin/login") {
+                doLogout();
+            }
+            throw new Error(errData.error || "用户名或密码错误，请检查");
         }
         if (res.status === 409 || res.status === 400) {
-            const errData = await res.json();
+            const errData = await res.json().catch(() => ({}));
             throw new Error(errData.error || "请求失败");
         }
         if (res.status === 429) {
-            const errData = await res.json();
-            showToast(errData.error || "请求过于频繁，请稍后再试", "fa-triangle-exclamation");
-            throw new Error("Rate limited");
+            const errData = await res.json().catch(() => ({}));
+            const msg = errData.error || "请求过于频繁或触发安全锁定，请稍后再试";
+            showToast("🚫 " + msg, "fa-triangle-exclamation");
+            throw new Error(msg);
         }
         return await res.json();
     }
@@ -1729,17 +1787,29 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         client_ip = self._get_client_ip()
 
-        # 1. User & Admin Login (Hardened Anti-Brute-Force & PBKDF2)
+        # 1. User & Admin Login (Dual-Dimension Anti-Brute-Force & Timing Attack Shield)
         if path == '/api/auth/login' or path == '/api/admin/login':
-            if is_rate_limited(client_ip):
-                self._send_json(429, {"error": "登录尝试次数过多，IP 已被临时锁定 5 分钟，请稍后再试。"})
-                return
-
             username = (body.get('username') or body.get('user') or '').strip()
             password = str(body.get('password') or body.get('admin_secret') or '')
 
+            # Check IP and Username rate limits
+            is_locked, retry_after, lock_msg = check_rate_limit(client_ip, username)
+            if is_locked:
+                self.send_response(429)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Retry-After', str(retry_after))
+                self._send_security_headers()
+                self.end_headers()
+                resp = json.dumps({
+                    "error": lock_msg,
+                    "code": "ACCOUNT_OR_IP_LOCKED",
+                    "retry_after": retry_after
+                }, ensure_ascii=False).encode('utf-8')
+                self.wfile.write(resp)
+                return
+
             if not username or not password:
-                self._send_json(400, {"error": "Username and password are required"})
+                self._send_json(400, {"error": "用户名和密码均不能为空"})
                 return
 
             conn = get_db_connection()
@@ -1753,9 +1823,14 @@ class RequestHandler(BaseHTTPRequestHandler):
                 stored_salt = user_row['salt']
                 if verify_password_pbkdf2(password, stored_hash, stored_salt):
                     authenticated = True
+            else:
+                # Timing Attack & Enumeration Shield:
+                # Execute identical 100,000-iteration PBKDF2 calculation for non-existent users
+                # so compute times are indistinguishable to external observers.
+                hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), b'pwdmanager_timing_shield_salt_2026', 100000)
 
             if authenticated:
-                clear_failed_attempts(client_ip)
+                clear_failed_attempts(client_ip, username)
                 token = secrets.token_hex(32)
                 token_exp = get_iso_future(30)
                 cursor.execute("UPDATE users SET token = ?, token_expire_at = ?, updated_at = ? WHERE username = ?",
@@ -1771,8 +1846,18 @@ class RequestHandler(BaseHTTPRequestHandler):
                 })
             else:
                 conn.close()
-                record_failed_attempt(client_ip)
-                self._send_json(401, {"error": "用户名或密码错误"})
+                remaining = record_failed_attempt(client_ip, username)
+                # Progressive backoff delay (slows down automated bot attacks)
+                time.sleep(0.3)
+                if remaining > 0:
+                    err_msg = f"用户名或密码错误 (还剩 {remaining} 次尝试机会，连续失败将锁定 5 分钟)"
+                else:
+                    err_msg = f"用户名或密码错误，尝试次数已达上限，已触发 5 分钟安全锁定"
+                self._send_json(401, {
+                    "error": err_msg,
+                    "remaining_attempts": remaining,
+                    "code": "INVALID_CREDENTIALS"
+                })
             return
 
         user = self._get_auth_user()

@@ -483,13 +483,13 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
             String testPass = etServerPass.getText() != null ? etServerPass.getText().toString().trim() : "";
             tvResult.setText("正在测试鉴权...");
             bgExecutor.execute(() -> {
-                boolean ok = ApiClient.login(this, testUrl, testUser, testPass);
+                ApiClient.LoginResult result = ApiClient.loginWithDetails(this, testUrl, testUser, testPass);
                 runOnUiThread(() -> {
-                    if (ok) {
+                    if (result.success) {
                         tvResult.setText("鉴权成功 (Token 已获取)");
                         tvResult.setTextColor(getResources().getColor(R.color.success));
                     } else {
-                        tvResult.setText("鉴权失败: 用户名/密码错误或无法连接");
+                        tvResult.setText("鉴权失败: " + result.errorMessage);
                         tvResult.setTextColor(getResources().getColor(R.color.error));
                     }
                 });

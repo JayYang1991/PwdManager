@@ -79,7 +79,21 @@ public class ApiClient {
         }
     }
 
-    public static synchronized boolean login(Context context, String serverUrl, String user, String pass) {
+    public static class LoginResult {
+        public final boolean success;
+        public final String errorMessage;
+        public final int remainingAttempts;
+        public final int retryAfter;
+
+        public LoginResult(boolean success, String errorMessage, int remainingAttempts, int retryAfter) {
+            this.success = success;
+            this.errorMessage = errorMessage;
+            this.remainingAttempts = remainingAttempts;
+            this.retryAfter = retryAfter;
+        }
+    }
+
+    public static synchronized LoginResult loginWithDetails(Context context, String serverUrl, String user, String pass) {
         try {
             JSONObject loginJson = new JSONObject();
             loginJson.put("username", user);
@@ -93,12 +107,27 @@ public class ApiClient {
                 setUsername(context, user);
                 setPassword(context, pass);
                 setAuthToken(context, token);
-                return true;
+                return new LoginResult(true, "登录成功", 5, 0);
+            } else {
+                String errMsg = "用户名或密码错误";
+                int remaining = -1;
+                int retryAfter = 0;
+                try {
+                    JSONObject errObj = new JSONObject(res.body);
+                    if (errObj.has("error")) errMsg = errObj.getString("error");
+                    remaining = errObj.optInt("remaining_attempts", -1);
+                    retryAfter = errObj.optInt("retry_after", 0);
+                } catch (Exception ignored) {}
+                return new LoginResult(false, errMsg, remaining, retryAfter);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            return new LoginResult(false, "连接服务端失败: " + e.getMessage(), -1, 0);
         }
-        return false;
+    }
+
+    public static synchronized boolean login(Context context, String serverUrl, String user, String pass) {
+        LoginResult res = loginWithDetails(context, serverUrl, user, pass);
+        return res.success;
     }
 
     public static HttpResponse authenticatedRequest(Context context, String urlString, String method, JSONObject jsonBody) throws Exception {
