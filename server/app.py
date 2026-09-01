@@ -109,10 +109,10 @@ def init_db():
         )
     """)
 
-    # Default users: jason / JYang@1991, admin / Admin@PwdManager2026
+    # Default users: jason / admin@1234, admin / admin@1234
     default_users = [
-        ("jason", "JYang@1991", "admin"),
-        ("admin", "Admin@PwdManager2026", "admin")
+        ("admin", "admin@1234", "admin"),
+        ("jason", "admin@1234", "admin")
     ]
     for u, p, r in default_users:
         cursor.execute("SELECT username FROM users WHERE username = ?", (u,))
@@ -120,6 +120,8 @@ def init_db():
             token = secrets.token_hex(24)
             cursor.execute("INSERT INTO users (username, password_hash, role, token, updated_at) VALUES (?, ?, ?, ?, ?)",
                            (u, hash_password(p), r, token, get_iso_now()))
+        else:
+            cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(p), u))
 
     # 2. Passwords table
     cursor.execute("""
@@ -193,7 +195,7 @@ def authenticate_token(token: str):
     conn.close()
     if row:
         return {"username": row["username"], "role": row["role"]}
-    if token == "Admin@PwdManager2026" or token == "JYang@1991":
+    if token == "admin@1234" or token == "admin@1234":
         return {"username": "admin", "role": "admin"}
     return None
 
@@ -290,7 +292,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         </div>
         <div class="form-group" style="text-align: left;">
             <label class="form-label">密码</label>
-            <input type="password" id="loginPassword" class="form-input" value="JYang@1991" placeholder="请输入密码">
+            <input type="password" id="loginPassword" class="form-input" value="admin@1234" placeholder="请输入密码">
         </div>
         <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="doLogin()">
             <i class="fa-solid fa-lock-open"></i> 登 录 控 制 台
@@ -975,7 +977,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 cursor.execute("SELECT * FROM users WHERE password_hash = ?", (hash_password(password),))
                 user_row = cursor.fetchone()
 
-            if user_row and (user_row['password_hash'] == hash_password(password) or password == "Admin@PwdManager2026" or password == "JYang@1991"):
+            if user_row and (user_row['password_hash'] == hash_password(password) or password == "admin@1234" or password == "admin@1234"):
                 token = secrets.token_hex(24)
                 cursor.execute("UPDATE users SET token = ?, updated_at = ? WHERE username = ?", (token, get_iso_now(), user_row['username']))
                 conn.commit()

@@ -20,7 +20,7 @@ public class ApiClient {
 
     public static final String DEFAULT_SERVER_URL = "http://192.168.122.100:8000";
     public static final String DEFAULT_USERNAME = "jason";
-    public static final String DEFAULT_PASSWORD = "JYang@1991";
+    public static final String DEFAULT_PASSWORD = "admin@1234";
 
     public static String getServerUrl(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);

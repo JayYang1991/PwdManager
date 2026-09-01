@@ -1,5 +1,9 @@
 [
     {
+        "merged": "com.pwdmanager.app-merged_res-33:/layout_dialog_settings.xml.flat",
+        "source": "com.pwdmanager.app-main-35:/layout/dialog_settings.xml"
+    },
+    {
         "merged": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-merged_res-33:/layout_dialog_add_edit.xml.flat",
         "source": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-main-35:/layout/dialog_add_edit.xml"
     },
@@ -20,24 +24,12 @@
         "source": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-main-35:/layout/item_password.xml"
     },
     {
-        "merged": "com.pwdmanager.app-merged_res-33:/drawable_ic_launcher_foreground.xml.flat",
-        "source": "com.pwdmanager.app-main-35:/drawable/ic_launcher_foreground.xml"
+        "merged": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-merged_res-33:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-main-35:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-merged_res-33:/drawable_ic_launcher_foreground.xml.flat",
         "source": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-main-35:/drawable/ic_launcher_foreground.xml"
-    },
-    {
-        "merged": "com.pwdmanager.app-merged_res-33:/drawable_ic_launcher_background.xml.flat",
-        "source": "com.pwdmanager.app-main-35:/drawable/ic_launcher_background.xml"
-    },
-    {
-        "merged": "com.pwdmanager.app-merged_res-33:/layout_dialog_settings.xml.flat",
-        "source": "com.pwdmanager.app-main-35:/layout/dialog_settings.xml"
-    },
-    {
-        "merged": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-merged_res-33:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-main-35:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "/home/jason/.gradle/daemon/8.5/com.pwdmanager.app-merged_res-33:/xml_network_security_config.xml.flat",

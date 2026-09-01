@@ -3,7 +3,7 @@
 Comprehensive Test Suite for Password Manager Server & Web API
 Tests:
 1. Web Dashboard HTTP 200 & HTML response
-2. User Authentication (jason / JYang@1991) -> Token
+2. User Authentication (jason / admin@1234) -> Token
 3. Server-Side Encryption on password creation
 4. Server-Side Decryption on retrieval (?decrypt=1)
 5. Record Update with new password & re-encryption
@@ -54,8 +54,8 @@ def run_tests(base_url="http://127.0.0.1:8000"):
         assert "服务端安全加密" in html
         print("  [PASS] 1. GET / (Web Management Dashboard HTML served successfully)")
 
-    # 2. Test User Authentication (jason / JYang@1991)
-    login_payload = {"username": "jason", "password": "JYang@1991"}
+    # 2. Test User Authentication (jason / admin@1234)
+    login_payload = {"username": "jason", "password": "admin@1234"}
     status, auth_data = request_json(f"{base_url}/api/auth/login", "POST", login_payload)
     assert status == 200, f"Login failed: {status} {auth_data}"
     token = auth_data.get("token")

@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/dist/in
 
 - **Web 控制台地址**：`http://<服务器IP>:8000`
 - **默认管理员账号**：`jason`
-- **默认管理员密码**：`JYang@1991`
+- **默认管理员密码**：`admin@1234`
 
 ---
 
@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/dist/in
 打开 APP 后，在右上角 ⚙️ **设置** 中配置服务器地址、用户名及密码即可完成鉴权并开始双向同步：
 - **服务器域名/IP**：`http://<服务器IP>:8000`
 - **用户名**：`jason`
-- **密码**：`JYang@1991`
+- **密码**：`admin@1234`
 
 ---
 
