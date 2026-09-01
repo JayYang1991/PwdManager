@@ -57,7 +57,8 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert headers.get("X-Content-Type-Options") == "nosniff", "Missing X-Content-Type-Options header!"
     assert headers.get("X-Frame-Options") == "DENY", "Missing X-Frame-Options header!"
     assert "Content-Security-Policy" in headers, "Missing Content-Security-Policy header!"
-    print("  [PASS] 1. GET / (Web Dashboard & OWASP Security Headers verified: nosniff, DENY, CSP)")
+    assert "Strict-Transport-Security" in headers, "Missing Strict-Transport-Security header!"
+    print("  [PASS] 1. GET / (Web Dashboard & OWASP Security Headers verified: nosniff, DENY, CSP, HSTS)")
 
     # 2. Test Rejection of Invalid Logins (No Backdoors)
     bad_login = {"username": "admin", "password": "WrongPassword!2026"}

@@ -85,13 +85,11 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
         });
 
         holder.btnCopyUsername.setOnClickListener(v -> {
-            copyToClipboard("Username", item.getUsername());
-            Toast.makeText(context, "已复制账号", Toast.LENGTH_SHORT).show();
+            copyToClipboard("Username", item.getUsername(), false);
         });
 
         holder.btnCopyPassword.setOnClickListener(v -> {
-            copyToClipboard("Password", item.getPassword());
-            Toast.makeText(context, "已复制密码到剪贴板", Toast.LENGTH_SHORT).show();
+            copyToClipboard("Password", item.getPassword(), true);
         });
 
         if (item.getNotes() != null && !item.getNotes().trim().isEmpty()) {
@@ -115,11 +113,36 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
         return items.size();
     }
 
-    private void copyToClipboard(String label, String text) {
+    private void copyToClipboard(String label, String text, boolean isSensitive) {
         ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) return;
         ClipData clip = ClipData.newPlainText(label, text);
-        if (clipboard != null) {
-            clipboard.setPrimaryClip(clip);
+        if (isSensitive && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            android.os.PersistableBundle bundle = new android.os.PersistableBundle();
+            bundle.putBoolean("android.content.extra.IS_SENSITIVE", true);
+            clip.getDescription().setExtras(bundle);
+        }
+        clipboard.setPrimaryClip(clip);
+
+        if (isSensitive) {
+            Toast.makeText(context, "密码已复制，30秒后将自动从剪贴板清除", Toast.LENGTH_SHORT).show();
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    ClipData current = clipboard.getPrimaryClip();
+                    if (current != null && current.getItemCount() > 0) {
+                        CharSequence currentText = current.getItemAt(0).getText();
+                        if (text != null && text.equals(currentText != null ? currentText.toString() : "")) {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                clipboard.clearPrimaryClip();
+                            } else {
+                                clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }, 30000);
+        } else {
+            Toast.makeText(context, "已复制账号", Toast.LENGTH_SHORT).show();
         }
     }
 

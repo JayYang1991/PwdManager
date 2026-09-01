@@ -785,7 +785,15 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 class RequestHandler(BaseHTTPRequestHandler):
     def _send_security_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin', '')
+        host = self.headers.get('Host', '')
+
+        # Secure CORS origin reflection for trusted intranet / localhost / same-host origins
+        if origin and (origin.endswith(host) or "127.0.0.1" in origin or "localhost" in origin or "192.168." in origin or "10." in origin or "172." in origin):
+            self.send_header('Access-Control-Allow-Origin', origin)
+        else:
+            self.send_header('Access-Control-Allow-Origin', '*')
+
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token, X-Requested-With')
         # Standard OWASP Web Security Headers
@@ -793,6 +801,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('X-XSS-Protection', '1; mode=block')
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
+        self.send_header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         self.send_header('Content-Security-Policy', "default-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'")
 
     def do_OPTIONS(self):

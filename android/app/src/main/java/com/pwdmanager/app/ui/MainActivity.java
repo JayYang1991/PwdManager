@@ -45,6 +45,11 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Security Hardening: Protect against screen capture and task snapshots
+        getWindow().setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        );
         setContentView(R.layout.activity_main);
 
         dbHelper = PasswordDatabaseHelper.getInstance(this);
