@@ -861,6 +861,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <div class="modal-box">
         <h3 class="modal-title" id="modalTitle"><i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录</h3>
         <input type="hidden" id="editId">
+        <input type="hidden" id="mVersion">
         <div class="form-group">
             <label class="form-label">网站 / 应用名称 *</label>
             <input type="text" id="mName" class="form-input" placeholder="例如: GitHub / 阿里云 / Google">
@@ -1164,7 +1165,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function showAddModal() {
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录`;
         document.getElementById("editId").value = "";
-        document.getElementById("mVersion").value = "0";
+        const mV = document.getElementById("mVersion"); if (mV) mV.value = "0";
         document.getElementById("mName").value = "";
         document.getElementById("mUrl").value = "";
         document.getElementById("mUsername").value = "";
@@ -1178,7 +1179,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (!item) return;
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-pen-to-square" style="color: var(--accent-cyan);"></i> 编辑密码记录`;
         document.getElementById("editId").value = item.id;
-        document.getElementById("mVersion").value = item.version !== undefined ? item.version : 0;
+        const mV = document.getElementById("mVersion"); if (mV) mV.value = item.version !== undefined ? item.version : 0;
         document.getElementById("mName").value = item.name;
         document.getElementById("mUrl").value = item.url || "";
         document.getElementById("mUsername").value = item.username || "";
