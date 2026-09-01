@@ -156,6 +156,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         TextInputEditText etName = dialogView.findViewById(R.id.etDialogName);
         TextInputEditText etUrl = dialogView.findViewById(R.id.etDialogUrl);
         TextInputEditText etUsername = dialogView.findViewById(R.id.etDialogUsername);
+        com.google.android.material.textfield.TextInputLayout tilPassword = dialogView.findViewById(R.id.tilPassword);
         TextInputEditText etPassword = dialogView.findViewById(R.id.etDialogPassword);
         TextInputEditText etNotes = dialogView.findViewById(R.id.etDialogNotes);
         Button btnGenerate = dialogView.findViewById(R.id.btnGeneratePassword);
@@ -176,7 +177,8 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         btnGenerate.setOnClickListener(v -> {
             String gen = CryptoUtils.generateStrongPassword(16);
             etPassword.setText(gen);
-            Toast.makeText(MainActivity.this, "已生成高强度密码", Toast.LENGTH_SHORT).show();
+            tilPassword.setPasswordVisibilityToggleEnabled(true);
+            Toast.makeText(MainActivity.this, "🎲 已生成 16 位高强度随机密码！", Toast.LENGTH_SHORT).show();
         });
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
@@ -249,14 +251,20 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                                 }
                             } else {
                                 String errMsg = parseErrorMessage(res.body, "服务端创建失败");
-                                Toast.makeText(MainActivity.this, "保存失败: " + errMsg + " (本地未保存)", Toast.LENGTH_LONG).show();
+                                performSync();
+                                new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("❌ 服务端保存失败")
+                                        .setMessage(errMsg + "\n\n已自动从服务端重新同步最新数据与全局版本号，请核对后重试！")
+                                        .setPositiveButton("我知道了", null)
+                                        .show();
                             }
                         });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
                             btnSave.setEnabled(true);
                             btnSave.setText(R.string.save_and_push);
-                            Toast.makeText(MainActivity.this, "网络错误: " + e.getMessage() + " (本地未保存)", Toast.LENGTH_LONG).show();
+                            performSync();
+                            Toast.makeText(MainActivity.this, "网络错误: " + e.getMessage() + "\n已自动重新同步服务端数据与版本号", Toast.LENGTH_LONG).show();
                         });
                     }
                 });
@@ -349,6 +357,9 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         }
                         performSync();
                     } else {
+                        // Always resync data and version from server on any mutation failure
+                        performSync();
+
                         // Check if it's a version mismatch conflict
                         try {
                             JSONObject errObj = new JSONObject(updateRes.body);
@@ -357,16 +368,10 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                                 long cVer = errObj.optLong("client_version", currentGv);
                                 new AlertDialog.Builder(MainActivity.this)
                                         .setTitle("⚠️ 全局版本冲突 (Version Mismatch)")
-                                        .setMessage("服务端全局版本已更新至 v" + sVer + "，而当前本地提交版本为 v" + cVer + "。\n服务端已拒绝修改以保护数据一致性。\n\n请选择处理方式：")
-                                        .setPositiveButton("拉取服务端最新数据覆盖本地", (d, w) -> {
-                                            performSync();
+                                        .setMessage("服务端全局版本已更新至 v" + sVer + "，而当前提交版本为 v" + cVer + "。\n服务端已拒绝修改以保护数据一致性。\n\n已自动从服务端重新拉取最新数据与版本号，请核对最新记录后重新编辑！")
+                                        .setPositiveButton("我知道了", (d, w) -> {
                                             if (editDialog != null) editDialog.dismiss();
                                         })
-                                        .setNeutralButton("强制以最新版本号重试覆盖", (d, w) -> {
-                                            dbHelper.setGlobalVersion(sVer);
-                                            executeServerUpdate(item, editDialog, btnSave);
-                                        })
-                                        .setNegativeButton("取消", null)
                                         .show();
                                 return;
                             }
@@ -376,8 +381,10 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         String errMsg = parseErrorMessage(updateRes.body, "服务端更新拒绝");
                         new AlertDialog.Builder(MainActivity.this)
                                 .setTitle("❌ 服务端修改失败")
-                                .setMessage(errMsg + "\n\n根据数据一致性原则，本地未做任何修改。")
-                                .setPositiveButton("我知道了", null)
+                                .setMessage(errMsg + "\n\n已自动从服务端重新同步最新数据与全局版本号，请核对后重试！")
+                                .setPositiveButton("我知道了", (d, w) -> {
+                                    if (editDialog != null) editDialog.dismiss();
+                                })
                                 .show();
                     }
                 });
@@ -387,7 +394,8 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         btnSave.setEnabled(true);
                         btnSave.setText(R.string.save_and_push);
                     }
-                    Toast.makeText(MainActivity.this, "修改失败: " + e.getMessage() + " (本地未保存)", Toast.LENGTH_LONG).show();
+                    performSync();
+                    Toast.makeText(MainActivity.this, "修改失败: " + e.getMessage() + "\n已自动重新同步服务端数据与版本号", Toast.LENGTH_LONG).show();
                 });
             }
         });
@@ -786,7 +794,8 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
 
                         @Override
                         public void onError(String errorMsg) {
-                            Toast.makeText(MainActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
+                            performSync();
+                            Toast.makeText(MainActivity.this, "删除失败: " + errorMsg + "\n已自动从服务端重新同步最新数据与版本号", Toast.LENGTH_LONG).show();
                             loadLocalData();
                         }
                     });

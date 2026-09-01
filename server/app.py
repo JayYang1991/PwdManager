@@ -1104,10 +1104,13 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         try {
             const res = await api("/api/passwords?decrypt=1");
             allRecords = res.records || [];
+            currentGlobalVersion = res.global_version !== undefined ? res.global_version : 0;
             document.getElementById("statTotalCount").innerText = allRecords.length;
+            const badge = document.getElementById("statGlobalVersion");
+            if (badge) badge.innerText = "v" + currentGlobalVersion;
             renderPasswords();
         } catch (e) {
-            console.error(e);
+            console.error("loadPasswords error:", e);
         }
     }
 
@@ -1198,24 +1201,33 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         const payload = { name, url, username, password, notes, version: currentGlobalVersion };
-        if (id) {
-            payload.id = id;
-            await api(`/api/passwords/${id}`, "PUT", payload);
-            showToast("密码记录更新并已重新加密！");
-        } else {
-            await api("/api/passwords", "POST", payload);
-            showToast("密码记录已由服务端 AES-256-GCM 安全加密！");
+        try {
+            if (id) {
+                payload.id = id;
+                await api(`/api/passwords/${id}`, "PUT", payload);
+                showToast("🎉 密码记录更新并已由服务端重新加密！");
+            } else {
+                await api("/api/passwords", "POST", payload);
+                showToast("🎉 密码记录已由服务端 AES-256-GCM 安全加密！");
+            }
+            closeModal("pwdModal");
+            await loadPasswords();
+        } catch (e) {
+            showToast("⚠️ 操作失败：" + e.message + "，已自动重新同步服务端数据与版本号！", "fa-triangle-exclamation");
+            await loadPasswords();
         }
-
-        closeModal("pwdModal");
-        await loadPasswords();
     }
 
     async function deletePassword(id, name) {
         if (confirm(`确定要删除「${name}」的记录吗？`)) {
-            await api(`/api/passwords/${id}`, "DELETE");
-            showToast(`已删除「${name}」的记录`);
-            await loadPasswords();
+            try {
+                await api(`/api/passwords/${id}`, "DELETE");
+                showToast(`已删除「${name}」的记录`);
+                await loadPasswords();
+            } catch (e) {
+                showToast("⚠️ 删除失败：" + e.message + "，已自动重新同步服务端数据与版本号！", "fa-triangle-exclamation");
+                await loadPasswords();
+            }
         }
     }
 
@@ -1270,11 +1282,16 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             showToast("新私钥不能为空", "fa-triangle-exclamation");
             return;
         }
-        const res = await api("/api/admin/rotate-key", "POST", { old_key, new_key, reencrypt_records: true });
-        showToast(`密钥更换成功！已自动重新加密 ${res.reencrypted_records_count} 条记录。`);
-        closeModal("rotateModal");
-        await loadKey();
-        await loadPasswords();
+        try {
+            const res = await api("/api/admin/rotate-key", "POST", { old_key, new_key, reencrypt_records: true });
+            showToast(`🎉 密钥更换成功！已自动重新加密 ${res.reencrypted_records_count} 条记录。`);
+            closeModal("rotateModal");
+            await loadKey();
+            await loadPasswords();
+        } catch (e) {
+            showToast("⚠️ 密钥更换失败：" + e.message + "，已自动重新同步服务端数据！", "fa-triangle-exclamation");
+            await loadPasswords();
+        }
     }
 
     async function exportData() {
@@ -1314,20 +1331,49 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             records: parsed.records || (Array.isArray(parsed) ? parsed : [])
         };
 
-        const res = await api("/api/admin/import", "POST", payload);
-        showToast(`导入成功！共导入 ${res.imported_records_count} 条记录。`);
-        closeModal("importModal");
-        await loadKey();
-        await loadPasswords();
+        try {
+            const res = await api("/api/admin/import", "POST", payload);
+            showToast(`🎉 导入成功！共导入 ${res.imported_records_count} 条记录。`);
+            closeModal("importModal");
+            await loadKey();
+            await loadPasswords();
+        } catch (e) {
+            showToast("⚠️ 导入失败：" + e.message + "，已自动重新同步服务端数据！", "fa-triangle-exclamation");
+            await loadPasswords();
+        }
     }
 
     function generateRandomPwd() {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+~";
-        let str = "";
-        for (let i = 0; i < 16; i++) {
-            str += chars.charAt(Math.floor(Math.random() * chars.length));
+        const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const lowers = "abcdefghijklmnopqrstuvwxyz";
+        const digits = "0123456789";
+        const specials = "!@#$%^&*()_+~-=";
+        const all = uppers + lowers + digits + specials;
+
+        let pwdArr = [];
+        const randomValues = new Uint32Array(16);
+        window.crypto.getRandomValues(randomValues);
+
+        pwdArr.push(uppers[randomValues[0] % uppers.length]);
+        pwdArr.push(lowers[randomValues[1] % lowers.length]);
+        pwdArr.push(digits[randomValues[2] % digits.length]);
+        pwdArr.push(specials[randomValues[3] % specials.length]);
+
+        for (let i = 4; i < 16; i++) {
+            pwdArr.push(all[randomValues[i] % all.length]);
         }
-        document.getElementById("mPassword").value = str;
+
+        // Shuffle
+        for (let i = pwdArr.length - 1; i > 0; i--) {
+            const j = randomValues[i] % (i + 1);
+            const temp = pwdArr[i];
+            pwdArr[i] = pwdArr[j];
+            pwdArr[j] = temp;
+        }
+
+        const generated = pwdArr.join("");
+        document.getElementById("mPassword").value = generated;
+        showToast("🎲 已生成 16 位高强度随机密码！");
     }
 
     function genNewRotateKey() {
