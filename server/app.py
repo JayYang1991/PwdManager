@@ -706,11 +706,11 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 28px;">服务端全权安全加解密控制台 (Cosmic Vault)</p>
         <div class="form-group" style="text-align: left;">
             <label class="form-label"><i class="fa-solid fa-user-shield" style="color: var(--accent-cyan);"></i> 管理员用户名</label>
-            <input type="text" id="loginUsername" class="form-input" value="jason" placeholder="请输入用户名">
+            <input type="text" id="loginUsername" class="form-input" value="jason" placeholder="请输入用户名" onkeyup="if(event.key==='Enter')doLogin()">
         </div>
         <div class="form-group" style="text-align: left;">
             <label class="form-label"><i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> 管理员密码</label>
-            <input type="password" id="loginPassword" class="form-input" value="admin@1234" placeholder="请输入密码">
+            <input type="password" id="loginPassword" class="form-input" value="admin@1234" placeholder="请输入密码" onkeyup="if(event.key==='Enter')doLogin()">
         </div>
         <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; margin-top: 10px;" onclick="doLogin()">
             <i class="fa-solid fa-meteor"></i> 启 动 星 空 控 制 台
@@ -1263,7 +1263,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function openModal(id) { document.getElementById(id).style.display = "flex"; }
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
     function escapeHtml(s) { return (s||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-    function escapeJs(s) { return (s||'').replace(/\/g, "\\").replace(/'/g, "\'"); }
+    function escapeJs(s) { return (s || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
     if (authToken) {
         initApp();
