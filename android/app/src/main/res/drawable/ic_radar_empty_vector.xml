@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+  <!-- Outer glowing orbital ring -->
+  <path
+      android:fillColor="#15818CF8"
+      android:pathData="M36,4A32,32 0 1,0 68,36A32,32 0 0,0 36,4Z"/>
+  <path
+      android:fillColor="#336366F1"
+      android:pathData="M36,12A24,24 0 1,0 60,36A24,24 0 0,0 36,12Z"/>
+  <!-- Central Safe & Star Shield -->
+  <path
+      android:fillColor="#6366F1"
+      android:pathData="M36,20L22,26v14c0,9.2 6,17.8 14,20 8,-2.2 14,-10.8 14,-20V26l-14,-6z"/>
+  <path
+      android:fillColor="#38BDF8"
+      android:pathData="M36,25L26,29.5v10.5c0,6.9 4.3,13.4 10,15 5.7,-1.6 10,-8.1 10,-15V29.5L36,25z"/>
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M36,32a4,4 0 0,0 -4,4c0,1.5 0.8,2.8 2,3.5V44h4v-4.5c1.2,-0.7 2,-2 2,-3.5a4,4 0 0,0 -4,-4z"/>
+</vector>

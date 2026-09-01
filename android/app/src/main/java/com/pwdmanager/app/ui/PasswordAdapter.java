@@ -4,11 +4,15 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -31,6 +35,20 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     private final OnItemActionListener listener;
     private final List<PasswordItem> items = new ArrayList<>();
     private final Set<String> revealedPasswordIds = new HashSet<>();
+
+    // Curated Cosmic Avatar Gradient Color Pairs
+    private static final int[][] AVATAR_GRADIENTS = new int[][] {
+        { Color.parseColor("#6366F1"), Color.parseColor("#A855F7") }, // Indigo to Purple
+        { Color.parseColor("#3B82F6"), Color.parseColor("#06B6D4") }, // Blue to Cyan
+        { Color.parseColor("#EC4899"), Color.parseColor("#8B5CF6") }, // Pink to Violet
+        { Color.parseColor("#10B981"), Color.parseColor("#06B6D4") }, // Emerald to Teal
+        { Color.parseColor("#F59E0B"), Color.parseColor("#EF4444") }, // Amber to Red
+        { Color.parseColor("#8B5CF6"), Color.parseColor("#D946EF") }, // Violet to Fuchsia
+        { Color.parseColor("#14B8A6"), Color.parseColor("#3B82F6") }, // Teal to Blue
+        { Color.parseColor("#F43F5E"), Color.parseColor("#FB923C") }, // Rose to Orange
+        { Color.parseColor("#0284C7"), Color.parseColor("#6366F1") }, // Sky to Indigo
+        { Color.parseColor("#7C3AED"), Color.parseColor("#DB2777") }, // Purple to Pink
+    };
 
     public PasswordAdapter(Context context, OnItemActionListener listener) {
         this.context = context;
@@ -56,12 +74,33 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         PasswordItem item = items.get(position);
 
-        holder.tvName.setText(item.getName());
+        String name = item.getName() != null ? item.getName().trim() : "";
+        holder.tvName.setText(name.isEmpty() ? "未命名应用" : name);
 
+        // 1. Dynamic Vibrant Avatar Badge
+        String initial = "✦";
+        if (!name.isEmpty()) {
+            initial = name.substring(0, 1).toUpperCase();
+        }
+        holder.tvAvatarText.setText(initial);
+
+        int hash = Math.abs(name.hashCode());
+        int[] gradientColors = AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+        GradientDrawable avatarBg = new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            gradientColors
+        );
+        avatarBg.setCornerRadius(28f);
+        holder.layoutAvatar.setBackground(avatarBg);
+
+        // 2. Global Version Badge
+        holder.tvVersionBadge.setText("v" + item.getVersion());
+
+        // 3. Website URL
         if (item.getUrl() != null && !item.getUrl().trim().isEmpty()) {
-            holder.tvUrl.setVisibility(View.VISIBLE);
-            holder.tvUrl.setText(item.getUrl());
-            holder.tvUrl.setOnClickListener(v -> {
+            holder.layoutUrl.setVisibility(View.VISIBLE);
+            holder.tvUrl.setText(item.getUrl().trim());
+            holder.layoutUrl.setOnClickListener(v -> {
                 try {
                     String u = item.getUrl().trim();
                     if (!u.startsWith("http://") && !u.startsWith("https://")) {
@@ -74,20 +113,22 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
                 }
             });
         } else {
-            holder.tvUrl.setVisibility(View.GONE);
+            holder.layoutUrl.setVisibility(View.GONE);
         }
 
+        // 4. Username
         String u = item.getUsername();
         holder.tvUsername.setText((u == null || u.trim().isEmpty()) ? "(未填写)" : u);
 
+        // 5. Password Mask & Reveal
         boolean isRevealed = revealedPasswordIds.contains(item.getId());
         String p = item.getPassword();
         if (isRevealed) {
             holder.tvPassword.setText((p == null || p.isEmpty()) ? "(空密码)" : p);
-            holder.btnTogglePassword.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+            holder.btnTogglePassword.setImageResource(R.drawable.ic_eye_off_vector);
         } else {
             holder.tvPassword.setText("••••••••••••");
-            holder.btnTogglePassword.setImageResource(android.R.drawable.ic_menu_view);
+            holder.btnTogglePassword.setImageResource(R.drawable.ic_eye_vector);
         }
 
         holder.btnTogglePassword.setOnClickListener(v -> {
@@ -102,6 +143,7 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
             }
         });
 
+        // 6. Copy Actions
         holder.btnCopyUsername.setOnClickListener(v -> {
             copyToClipboard("Username", item.getUsername(), false);
         });
@@ -110,13 +152,15 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
             copyToClipboard("Password", item.getPassword(), true);
         });
 
+        // 7. Notes
         if (item.getNotes() != null && !item.getNotes().trim().isEmpty()) {
-            holder.tvNotes.setVisibility(View.VISIBLE);
-            holder.tvNotes.setText("备注: " + item.getNotes());
+            holder.layoutNotes.setVisibility(View.VISIBLE);
+            holder.tvNotes.setText("备注: " + item.getNotes().trim());
         } else {
-            holder.tvNotes.setVisibility(View.GONE);
+            holder.layoutNotes.setVisibility(View.GONE);
         }
 
+        // 8. Edit and Delete Handlers
         holder.btnEdit.setOnClickListener(v -> {
             if (listener != null) listener.onEdit(item);
         });
@@ -132,6 +176,10 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     }
 
     private void copyToClipboard(String label, String text, boolean isSensitive) {
+        if (text == null || text.isEmpty()) {
+            Toast.makeText(context, "内容为空", Toast.LENGTH_SHORT).show();
+            return;
+        }
         ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard == null) return;
         ClipData clip = ClipData.newPlainText(label, text);
@@ -143,13 +191,13 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
         clipboard.setPrimaryClip(clip);
 
         if (isSensitive) {
-            Toast.makeText(context, "密码已复制，30秒后将自动从剪贴板清除", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "🔐 密码已安全复制，30秒后将从剪贴板自动清除", Toast.LENGTH_SHORT).show();
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                 try {
                     ClipData current = clipboard.getPrimaryClip();
                     if (current != null && current.getItemCount() > 0) {
                         CharSequence currentText = current.getItemAt(0).getText();
-                        if (text != null && text.equals(currentText != null ? currentText.toString() : "")) {
+                        if (text.equals(currentText != null ? currentText.toString() : "")) {
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                                 clipboard.clearPrimaryClip();
                             } else {
@@ -160,20 +208,27 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
                 } catch (Exception ignored) {}
             }, 30000);
         } else {
-            Toast.makeText(context, "已复制账号", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "📋 已复制账号到剪贴板", Toast.LENGTH_SHORT).show();
         }
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName, tvUrl, tvUsername, tvPassword, tvNotes;
+        FrameLayout layoutAvatar;
+        TextView tvAvatarText, tvName, tvVersionBadge, tvUrl, tvUsername, tvPassword, tvNotes;
+        LinearLayout layoutUrl, layoutNotes;
         ImageButton btnTogglePassword, btnCopyPassword, btnCopyUsername, btnEdit, btnDelete;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
+            layoutAvatar = itemView.findViewById(R.id.layoutAvatar);
+            tvAvatarText = itemView.findViewById(R.id.tvAvatarText);
             tvName = itemView.findViewById(R.id.tvName);
+            tvVersionBadge = itemView.findViewById(R.id.tvVersionBadge);
+            layoutUrl = itemView.findViewById(R.id.layoutUrl);
             tvUrl = itemView.findViewById(R.id.tvUrl);
             tvUsername = itemView.findViewById(R.id.tvUsername);
             tvPassword = itemView.findViewById(R.id.tvPassword);
+            layoutNotes = itemView.findViewById(R.id.layoutNotes);
             tvNotes = itemView.findViewById(R.id.tvNotes);
             btnTogglePassword = itemView.findViewById(R.id.btnTogglePassword);
             btnCopyPassword = itemView.findViewById(R.id.btnCopyPassword);

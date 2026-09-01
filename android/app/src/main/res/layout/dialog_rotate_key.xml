@@ -4,78 +4,112 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="20dp">
+    android:background="@color/bg_surface"
+    android:padding="22dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="主加密密钥轮换 (Key Rotation)"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_sync_vector"
+                android:contentDescription="Rotate Icon"
+                android:layout_marginEnd="10dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="一键更换主加密私钥"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="更换服务端 AES-256-GCM 主加密私钥，并自动对所有存量密码记录使用新私钥执行重加密与完整性保护。"
+            android:text="服务端将自动解密所有存量密码，并使用新私钥全量重新加密，保障绝对安全。"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textSize="12sp"
+            android:lineSpacingMultiplier="1.2"
             android:layout_marginBottom="16dp" />
 
-        <!-- Old Master Key -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="当前主私钥 (自动获取)"
+            android:hint="当前旧私钥 (留空使用服务端当前私钥)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            android:textColorHint="@color/text_hint"
             android:layout_marginBottom="12dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etRotOldKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"
+                android:textColor="@color/accent"
+                android:fontFamily="monospace"
+                android:textSize="13sp"
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- New Master Key -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="新主加密私钥"
+            android:hint="新加密主私钥 *"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="8dp">
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            android:textColorHint="@color/text_hint"
+            android:layout_marginBottom="6dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etRotNewKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"
+                android:textColor="@color/accent"
+                android:fontFamily="monospace"
+                android:textSize="13sp"
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button
             android:id="@+id/btnGenRotateKey"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🎲 生成随机高强度新私钥"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginBottom="14dp" />
+            android:layout_height="36dp"
+            android:text="✨ 随机生成新私钥"
+            android:textColor="@color/accent"
+            android:textSize="12sp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_gravity="end"
+            android:layout_marginBottom="6dp" />
 
         <CheckBox
             android:id="@+id/cbReencryptRecords"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="自动解密存量数据并使用新私钥重新加密 (推荐)"
+            android:text="全量重新加密现有存量记录 (推荐)"
+            android:textColor="@color/text_primary"
             android:checked="true"
-            android:textSize="13sp"
-            android:layout_marginBottom="18dp" />
+            android:layout_marginBottom="16dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -85,20 +119,24 @@
 
             <Button
                 android:id="@+id/btnRotCancel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/cancel"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="取消"
+                android:textColor="@color/text_secondary"
+                android:background="@drawable/bg_btn_outline"
                 android:layout_marginEnd="8dp" />
 
             <Button
                 android:id="@+id/btnRotSave"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="立即轮换私钥"
-                android:backgroundTint="@color/primary"
-                android:textColor="#FFFFFF" />
-
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="立即更换重加密"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:background="@drawable/bg_btn_gradient"
+                android:layout_marginStart="8dp" />
         </LinearLayout>
 
     </LinearLayout>

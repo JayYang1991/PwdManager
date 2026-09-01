@@ -1,18 +1,19 @@
 <resources>
-    <string name="app_name">密码管理器</string>
+    <string name="app_name">星空密码管理器</string>
     <string name="search_hint">搜索网站名称、网址或账号...</string>
-    <string name="add_password">添加密码</string>
-    <string name="edit_password">编辑密码</string>
-    <string name="website_name">网站名称</string>
-    <string name="website_name_hint">例如: GitHub / 谷歌 / 淘宝</string>
-    <string name="website_url">网站地址</string>
+    <string name="add_password">添加星空密码记录</string>
+    <string name="edit_password">编辑星空密码记录</string>
+    <string name="website_name">网站 / 应用名称</string>
+    <string name="website_name_hint">例如: GitHub / 谷歌 / 微信</string>
+    <string name="website_url">网站地址 (可选)</string>
     <string name="website_url_hint">例如: https://github.com</string>
     <string name="username">账号 / 用户名</string>
     <string name="username_hint">例如: user@example.com</string>
     <string name="password">密码</string>
-    <string name="password_hint">请输入或生成密码</string>
-    <string name="notes">备注说明</string>
+    <string name="password_hint">请输入或随机生成强密码</string>
+    <string name="notes">备注说明 (可选)</string>
     <string name="notes_hint">可选备注信息...</string>
+    <string name="save">保存</string>
     <string name="save_and_push">保存并推送到服务端</string>
     <string name="cancel">取消</string>
     <string name="delete">删除</string>

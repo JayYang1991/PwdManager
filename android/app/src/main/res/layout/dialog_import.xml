@@ -4,60 +4,90 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="20dp">
+    android:background="@color/bg_surface"
+    android:padding="22dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="数据恢复与导入 (Import Backup)"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_astronaut_logo"
+                android:contentDescription="Import Icon"
+                android:layout_marginEnd="10dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="导入备份数据"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="从导出的 JSON 备份数据中恢复密码记录与私钥。若导入包含 private_key，服务端将自动更新并适配。"
+            android:text="请粘贴之前导出的 JSON 备份数据字符串："
             android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:layout_marginBottom="16dp" />
+            android:textSize="12sp"
+            android:layout_marginBottom="14dp" />
 
-        <!-- Optional Custom Master Key -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="指定主私钥 (选填，留空则沿用备份中私钥)"
+            android:hint="指定导入主私钥 (留空使用备份内私钥)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="12dp">
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            android:textColorHint="@color/text_hint"
+            android:layout_marginBottom="10dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etImpKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"
+                android:textColor="@color/accent"
+                android:fontFamily="monospace"
+                android:textSize="12sp"
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- JSON Data -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="粘贴 JSON 备份数据"
+            android:hint="JSON 备份数据 *"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="18dp">
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            android:textColorHint="@color/text_hint"
+            android:layout_marginBottom="20dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etImpJson"
                 android:layout_width="match_parent"
-                android:layout_height="140dp"
-                android:gravity="top|start"
-                android:inputType="textMultiLine" />
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:fontFamily="monospace"
+                android:textSize="12sp"
+                android:inputType="textMultiLine"
+                android:minLines="4"
+                android:maxLines="8" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
@@ -68,20 +98,24 @@
 
             <Button
                 android:id="@+id/btnImpCancel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/cancel"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="取消"
+                android:textColor="@color/text_secondary"
+                android:background="@drawable/bg_btn_outline"
                 android:layout_marginEnd="8dp" />
 
             <Button
                 android:id="@+id/btnImpSave"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="确认导入恢复"
-                android:backgroundTint="@color/primary"
-                android:textColor="#FFFFFF" />
-
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="确认导入"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:background="@drawable/bg_btn_gradient"
+                android:layout_marginStart="8dp" />
         </LinearLayout>
 
     </LinearLayout>

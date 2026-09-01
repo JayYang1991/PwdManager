@@ -82,11 +82,14 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         performSync();
     }
 
+    private ImageButton btnClearSearch;
+
     private void initViews() {
         rvPasswords = findViewById(R.id.rvPasswords);
         swipeRefresh = findViewById(R.id.swipeRefresh);
         layoutEmpty = findViewById(R.id.layoutEmpty);
         etSearch = findViewById(R.id.etSearch);
+        btnClearSearch = findViewById(R.id.btnClearSearch);
         tvSyncStatus = findViewById(R.id.tvSyncStatus);
         btnSync = findViewById(R.id.btnSync);
         btnSettings = findViewById(R.id.btnSettings);
@@ -106,6 +109,13 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
 
         fabAdd.setOnClickListener(v -> showAddEditDialog(null));
 
+        if (btnClearSearch != null) {
+            btnClearSearch.setOnClickListener(v -> {
+                etSearch.setText("");
+                btnClearSearch.setVisibility(View.GONE);
+            });
+        }
+
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -113,6 +123,9 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 currentSearchQuery = s.toString();
+                if (btnClearSearch != null) {
+                    btnClearSearch.setVisibility(currentSearchQuery.isEmpty() ? View.GONE : View.VISIBLE);
+                }
                 loadLocalData();
             }
 
@@ -134,14 +147,14 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     }
 
     private void performSync() {
-        tvSyncStatus.setText(R.string.syncing);
+        tvSyncStatus.setText("🟡 正在同步...");
         swipeRefresh.setRefreshing(true);
 
         syncManager.syncWithServer(new SyncManager.SyncCallback() {
             @Override
             public void onSuccess(int addedOrUpdatedCount, long currentGlobalVersion) {
                 swipeRefresh.setRefreshing(false);
-                tvSyncStatus.setText("已同步 (v" + currentGlobalVersion + ", " + addedOrUpdatedCount + " 条)");
+                tvSyncStatus.setText("🟢 已同步 v" + currentGlobalVersion);
                 loadLocalData();
                 updateTitleWithVersion();
             }
@@ -149,7 +162,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
             @Override
             public void onError(String errorMsg) {
                 swipeRefresh.setRefreshing(false);
-                tvSyncStatus.setText("同步失败(离线)");
+                tvSyncStatus.setText("⚪ 离线模式");
                 Toast.makeText(MainActivity.this, errorMsg, Toast.LENGTH_LONG).show();
             }
         });
