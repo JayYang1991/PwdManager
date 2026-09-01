@@ -21,6 +21,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 import time
+import concurrent.futures
 
 def request_raw(url, method="GET", data=None, headers=None):
     if headers is None:
@@ -314,6 +315,162 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert status == 200
     assert occ_get2.get("plain_password") == "OCCPassword#GapHigh", "Server data must be protected against lower client version"
     print("  [PASS] 14. 64-bit Global Versioning, Atomic OCC & Multi-version Gap Sync fully validated!")
+
+    # 15. Multi-Client Concurrency, Race-Condition & Consistency Verification
+    print("\n  [*] Running Multi-Client Concurrency & Consistency Test Suite (Step 15)...")
+
+    # (a) 5 Clients Race Condition Simulation on Single Record Edit (OCC Conflict Detection)
+    race_id = f"race-{int(time.time()*1000)}"
+    status, _, race_create = request_raw(f"{base_url}/api/passwords", "POST",
+                                         {"id": race_id, "name": f"Race Target ({test_id})", "url": "https://race.example.com", "username": "race_user", "password": "InitialPassword#0"},
+                                         headers=auth_headers)
+    assert status == 201
+    base_gv = race_create.get("global_version")
+
+    # Simulate 5 distinct clients trying to edit the same record at the EXACT same time with the same base version
+    num_clients = 5
+    results = []
+
+    def client_edit_attempt(client_idx, target_ver):
+        return client_idx, request_raw(f"{base_url}/api/passwords/{race_id}", "PUT",
+                                      {"name": f"Race Target ({test_id})", "password": f"PasswordFromClient#{client_idx}", "version": target_ver},
+                                      headers=auth_headers)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_clients) as executor:
+        futures = [executor.submit(client_edit_attempt, i, base_gv) for i in range(1, num_clients + 1)]
+        for f in concurrent.futures.as_completed(futures):
+            results.append(f.result())
+
+    successes = [r for r in results if r[1][0] == 200]
+    conflicts = [r for r in results if r[1][0] == 409]
+
+    assert len(successes) == 1, f"Expected exactly 1 winner out of {num_clients} concurrent edits, got {len(successes)}"
+    assert len(conflicts) == num_clients - 1, f"Expected {num_clients - 1} 409 Conflict rejections, got {len(conflicts)}"
+    for _, c_res in conflicts:
+        assert c_res[2].get("code") == "VERSION_MISMATCH"
+        assert c_res[2].get("server_version") == base_gv + 1
+
+    winner_client_idx = successes[0][0]
+    print(f"      -> 15(a) OCC Race Condition: Client #{winner_client_idx} won (200 OK), other {len(conflicts)} clients rejected (409 Conflict with VERSION_MISMATCH)")
+
+    # (b) Simulated Client Auto-Resync & Retry Healing
+    # The 4 rejected clients auto-resync the latest version and retry sequentially
+    cur_v = base_gv + 1
+    for c_idx, _ in conflicts:
+        _, (status, _, retry_res) = client_edit_attempt(c_idx, cur_v)
+        assert status == 200, f"Client #{c_idx} failed on retry with synced version {cur_v}: {retry_res}"
+        cur_v = retry_res.get("global_version")
+    assert cur_v == base_gv + num_clients
+    print(f"      -> 15(b) Auto-Resync & Retry Healing: All rejected clients recovered and committed, global_version advanced from v{base_gv} to v{cur_v}")
+
+    # (c) 10 Concurrent Clients Adding Unique Records Simultaneously
+    start_gv_add = cur_v
+    num_add_clients = 10
+    add_results = []
+
+    def client_add_entry(client_idx):
+        entry_payload = {
+            "name": f"MultiClient_Add_{client_idx}_{test_id}",
+            "url": f"https://client{client_idx}.internal",
+            "username": f"user_c{client_idx}",
+            "password": f"SecureMultiPass_{client_idx}!@"
+        }
+        return client_idx, request_raw(f"{base_url}/api/passwords", "POST", entry_payload, headers=auth_headers)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_add_clients) as executor:
+        futures = [executor.submit(client_add_entry, i) for i in range(1, num_add_clients + 1)]
+        for f in concurrent.futures.as_completed(futures):
+            add_results.append(f.result())
+
+    for idx, (stat, _, res) in add_results:
+        assert stat == 201, f"Client #{idx} add failed: {res}"
+
+    _, _, pwds_after_add = request_raw(f"{base_url}/api/passwords", "GET", headers=auth_headers)
+    final_gv_add = pwds_after_add.get("global_version")
+    assert final_gv_add == start_gv_add + num_add_clients, f"Expected final global version {start_gv_add + num_add_clients}, got {final_gv_add}"
+    print(f"      -> 15(c) 10 Parallel Additions: 10/10 created atomically, global_version strictly incremented by 10 (v{start_gv_add} -> v{final_gv_add})")
+
+    # (d) Multi-Client Offline / Two-Way Partition Sync Convergence
+    # Simulate Client A (Mobile) offline with +5 versions and Client B (Web) online with +1 version
+    client_a_offline_ver = final_gv_add + 5
+    client_a_entry_id = f"client-a-{int(time.time()*1000)}"
+    sync_payload_a = {
+        "client_version": client_a_offline_ver,
+        "client_records": [
+            {
+                "id": client_a_entry_id,
+                "name": f"Client A Offline Record ({test_id})",
+                "url": "https://mobile.internal",
+                "username": "client_a",
+                "password": "ClientAPassword#999",
+                "version": client_a_offline_ver
+            }
+        ]
+    }
+    # Client A syncs (high version wins arbitration)
+    status, _, sync_a_res = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_payload_a, headers=auth_headers)
+    assert status == 200
+    assert sync_a_res.get("server_version") == client_a_offline_ver
+
+    # Client B (with stale version) syncs -> gets full dataset and updates local version to client_a_offline_ver
+    sync_payload_b = {
+        "client_version": final_gv_add,
+        "client_records": []
+    }
+    status, _, sync_b_res = request_raw(f"{base_url}/api/passwords/sync", "POST", sync_payload_b, headers=auth_headers)
+    assert status == 200
+    assert sync_b_res.get("server_version") == client_a_offline_ver
+    records_b = sync_b_res.get("server_records", [])
+    assert any(r["id"] == client_a_entry_id for r in records_b), "Client B must receive Client A's record after sync"
+    print(f"      -> 15(d) Partitioned Multi-Client Sync: High-version arbitration + stale client catch-up 100% consistent (v{client_a_offline_ver})")
+    # (e) High-Concurrency Multi-Client Read-Modify-Write Stress Test
+    print("      [*] Starting high-concurrency read-modify-write stress test (20 concurrent operations)...")
+    stress_entry_id = f"stress-{int(time.time()*1000)}"
+    status, _, stress_create = request_raw(f"{base_url}/api/passwords", "POST",
+                                           {"id": stress_entry_id, "name": f"Stress Shared Target ({test_id})", "url": "https://stress.test", "username": "stress_admin", "password": "StressPass#Init"},
+                                           headers=auth_headers)
+    assert status == 201
+    
+    total_stress_ops = 20
+    successful_updates = 0
+    total_retries = 0
+
+    def worker_stress_task(worker_id):
+        nonlocal total_retries
+        for attempt in range(20): # Max 20 retries
+            # 1. Read latest state
+            _, _, pwds = request_raw(f"{base_url}/api/passwords", "GET", headers=auth_headers)
+            cur_gv = pwds.get("global_version", 0)
+            
+            # 2. Attempt conditional update
+            payload = {
+                "name": f"Stress Shared Target ({test_id})",
+                "password": f"StressPass#W{worker_id}_A{attempt}",
+                "version": cur_gv
+            }
+            stat, _, res = request_raw(f"{base_url}/api/passwords/{stress_entry_id}", "PUT", payload, headers=auth_headers)
+            if stat == 200:
+                return True, attempt
+            elif stat == 409:
+                # Conflict encountered -> resync and retry
+                total_retries += 1
+                time.sleep(0.02 * (worker_id % 3 + 1))
+            else:
+                return False, attempt
+        return False, 20
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        stress_futures = [executor.submit(worker_stress_task, i) for i in range(1, total_stress_ops + 1)]
+        for f in concurrent.futures.as_completed(stress_futures):
+            ok, attempts = f.result()
+            assert ok, "Stress worker failed to converge"
+            successful_updates += 1
+
+    assert successful_updates == total_stress_ops, f"Expected {total_stress_ops} successful updates, got {successful_updates}"
+    print(f"      -> 15(e) 20 Concurrent Read-Modify-Write Cycles: All {successful_updates} converged successfully ({total_retries} OCC conflicts automatically resolved via resync & retry)")
+
+    print("  [PASS] 15. Multi-Client Concurrency, Race Condition, OCC & Consistency 100% verified!")
+
 
     print("\n==========================================================================================")
     print(">>> ALL SECURITY HARDENING, WEB HEADERS, AUTH & CRYPTO TESTS PASSED! <<<")
