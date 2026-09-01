@@ -828,7 +828,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <a href="/download/app.apk" class="btn btn-app" title="下载最新安卓版 APP">
                 <i class="fa-brands fa-android"></i> 下载 APP
             </a>
-            <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel">用户: admin</span>
+            <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel"></span>
             <button class="btn btn-outline" onclick="showChangePwdModal()"><i class="fa-solid fa-lock"></i> 修改密码</button>
             <button class="btn btn-outline" onclick="showRotateKeyModal()"><i class="fa-solid fa-key"></i> 更换私钥</button>
             <button class="btn btn-outline" onclick="exportData()"><i class="fa-solid fa-download"></i> 导出</button>
@@ -1098,6 +1098,13 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     }
 
     async function initApp() {
+        try {
+            const me = await api("/api/auth/me");
+            document.getElementById("currentUserLabel").innerText = "用户: " + me.username;
+        } catch (e) {
+            doLogout();
+            return;
+        }
         document.getElementById("loginSection").style.display = "none";
         document.getElementById("appSection").style.display = "flex";
         await loadKey();
