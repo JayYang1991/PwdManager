@@ -159,6 +159,8 @@ def init_db():
     if 'token_expire_at' not in cols:
         cursor.execute("ALTER TABLE users ADD COLUMN token_expire_at TEXT DEFAULT ''")
 
+
+
     # Default admin user: admin / admin@1234, jason / admin@1234
     default_users = [
         ("jason", "admin@1234", "admin"),
@@ -193,12 +195,18 @@ def init_db():
             notes TEXT DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            is_deleted INTEGER DEFAULT 0
+            is_deleted INTEGER DEFAULT 0,
+            version INTEGER NOT NULL DEFAULT 1
         )
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_updated_at ON password_entries (updated_at)
     """)
+
+    cursor.execute("PRAGMA table_info(password_entries)")
+    pwd_cols = [row[1] for row in cursor.fetchall()]
+    if 'version' not in pwd_cols:
+        cursor.execute("ALTER TABLE password_entries ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
     
     # 3. Server Config & Key History tables
     cursor.execute("""
@@ -1054,7 +1062,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             card.innerHTML = `
                 <div class="card-header">
                     <div>
-                        <div class="card-title">${escapeHtml(r.name)}</div>
+                        <div class="card-title">${escapeHtml(r.name)} <span style="font-size: 11px; background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); padding: 2px 7px; border-radius: 4px; font-weight: normal;">v${r.version || 1}</span></div>
                         ${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" class="card-url"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(r.url)}</a>` : ""}
                     </div>
                     <div class="card-actions">
@@ -1081,6 +1089,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function showAddModal() {
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录`;
         document.getElementById("editId").value = "";
+        document.getElementById("mVersion").value = "1";
         document.getElementById("mName").value = "";
         document.getElementById("mUrl").value = "";
         document.getElementById("mUsername").value = "";
@@ -1094,6 +1103,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (!item) return;
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-pen-to-square" style="color: var(--accent-cyan);"></i> 编辑密码记录`;
         document.getElementById("editId").value = item.id;
+        document.getElementById("mVersion").value = item.version || 1;
         document.getElementById("mName").value = item.name;
         document.getElementById("mUrl").value = item.url || "";
         document.getElementById("mUsername").value = item.username || "";
@@ -1115,7 +1125,8 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
 
-        const payload = { name, url, username, password, notes };
+        const version = parseInt(document.getElementById("mVersion").value) || 1;
+        const payload = { name, url, username, password, notes, version };
         if (id) {
             payload.id = id;
             await api(`/api/passwords/${id}`, "PUT", payload);
@@ -1741,15 +1752,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = r.get('iv', '')
                     r_salt = r.get('salt', '')
 
+                r_version = int(r.get('version', 1))
                 cursor.execute("""
                     INSERT INTO password_entries (
-                        id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name=excluded.name, url=excluded.url, username=excluded.username,
                         encrypted_password=excluded.encrypted_password, iv=excluded.iv, salt=excluded.salt,
-                        notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted
-                """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted))
+                        notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted,
+                        version=excluded.version
+                """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, r_version))
                 imported_count += 1
 
             conn.commit()
@@ -1806,15 +1819,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许重复添加！"})
                 return
 
+            version = int(body.get('version', 1))
             cursor.execute("""
                 INSERT INTO password_entries (
-                    id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name, url=excluded.url, username=excluded.username,
                     encrypted_password=excluded.encrypted_password, iv=excluded.iv, salt=excluded.salt,
-                    notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted
-            """, (entry_id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted))
+                    notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted,
+                    version=excluded.version
+            """, (entry_id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version))
             conn.commit()
 
             cursor.execute("SELECT * FROM password_entries WHERE id = ?", (entry_id,))
@@ -1854,20 +1869,38 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = record.get('iv', '')
                     r_salt = record.get('salt', '')
 
-                cursor.execute("SELECT updated_at FROM password_entries WHERE id = ?", (r_id,))
+                r_version = int(record.get('version', 1))
+                cursor.execute("SELECT version, updated_at FROM password_entries WHERE id = ?", (r_id,))
                 existing = cursor.fetchone()
 
-                if not existing or r_updated_at >= existing['updated_at']:
+                if not existing:
                     cursor.execute("""
                         INSERT INTO password_entries (
-                            id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(id) DO UPDATE SET
-                            name=excluded.name, url=excluded.url, username=excluded.username,
-                            encrypted_password=excluded.encrypted_password, iv=excluded.iv, salt=excluded.salt,
-                            notes=excluded.notes, updated_at=excluded.updated_at, is_deleted=excluded.is_deleted
-                    """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted))
+                            id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, r_version))
                     applied_count += 1
+                else:
+                    server_version = int(existing['version'])
+                    # Data with higher version prevails (高版本号优先)
+                    if r_version > server_version:
+                        cursor.execute("""
+                            UPDATE password_entries SET
+                                name = ?, url = ?, username = ?, encrypted_password = ?,
+                                iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
+                                version = ?
+                            WHERE id = ?
+                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_version, r_id))
+                        applied_count += 1
+                    elif r_version == server_version:
+                        if r_updated_at > existing['updated_at']:
+                            cursor.execute("""
+                                UPDATE password_entries SET
+                                    name = ?, url = ?, username = ?, encrypted_password = ?,
+                                    iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?
+                                WHERE id = ?
+                            """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_id))
+                            applied_count += 1
 
             conn.commit()
 
@@ -1951,12 +1984,42 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许修改为重复项！"})
             return
 
+        if 'version' not in body:
+            conn.close()
+            self._send_json(400, {"error": "修改记录密码接口需要传入当前版本号 (version)", "code": "VERSION_REQUIRED"})
+            return
+
+        client_version = int(body.get('version', 0))
+        server_version = int(existing['version'])
+
+        if client_version != server_version:
+            conn.close()
+            self._send_json(409, {
+                "error": f"版本冲突：服务端当前版本为 v{server_version}，接口传入版本为 v{client_version}，拒绝修改！",
+                "code": "VERSION_MISMATCH",
+                "server_version": server_version,
+                "client_version": client_version
+            })
+            return
+
+        # Atomic update & increment version (原子操作更新版本号)
         cursor.execute("""
             UPDATE password_entries SET
                 name = ?, url = ?, username = ?, encrypted_password = ?,
-                iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?
-            WHERE id = ?
-        """, (name, url, username, encrypted_password, iv, salt, notes, updated_at, is_deleted, entry_id))
+                iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
+                version = version + 1
+            WHERE id = ? AND version = ?
+        """, (name, url, username, encrypted_password, iv, salt, notes, updated_at, is_deleted, entry_id, client_version))
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            self._send_json(409, {
+                "error": "并发修改冲突：记录版本在更新过程中已变更，请刷新后重试！",
+                "code": "CONCURRENT_CONFLICT"
+            })
+            return
+
         conn.commit()
 
         cursor.execute("SELECT * FROM password_entries WHERE id = ?", (entry_id,))

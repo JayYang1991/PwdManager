@@ -56,7 +56,7 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         PasswordItem item = items.get(position);
 
-        holder.tvName.setText(item.getName());
+        holder.tvName.setText(item.getName() + "  [v" + Math.max(item.getVersion(), 1) + "]");
 
         if (item.getUrl() != null && !item.getUrl().trim().isEmpty()) {
             holder.tvUrl.setVisibility(View.VISIBLE);

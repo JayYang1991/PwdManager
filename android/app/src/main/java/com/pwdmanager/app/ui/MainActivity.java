@@ -315,13 +315,47 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         btnSave.setText(R.string.save_and_push);
                     }
                     if (updateRes.isSuccess) {
-                        // Server update succeeded -> Now save to local database
-                        dbHelper.upsertPassword(item);
-                        loadLocalData();
-                        if (editDialog != null) editDialog.dismiss();
-                        Toast.makeText(MainActivity.this, "修改成功，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                        // Server update succeeded atomically -> Now save to local database
+                        try {
+                            JSONObject obj = new JSONObject(updateRes.body);
+                            PasswordItem updatedItem = PasswordItem.fromJson(obj);
+                            updatedItem.setPassword(item.getPassword());
+                            dbHelper.upsertPassword(updatedItem);
+                            loadLocalData();
+                            if (editDialog != null) editDialog.dismiss();
+                            Toast.makeText(MainActivity.this, "修改成功 (版本已自增至 v" + updatedItem.getVersion() + ")，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                        } catch (Exception e) {
+                            item.setVersion(item.getVersion() + 1);
+                            dbHelper.upsertPassword(item);
+                            loadLocalData();
+                            if (editDialog != null) editDialog.dismiss();
+                            Toast.makeText(MainActivity.this, "修改成功，服务端与本地已同步", Toast.LENGTH_SHORT).show();
+                        }
                         performSync();
                     } else {
+                        // Check if it's a version mismatch conflict
+                        try {
+                            JSONObject errObj = new JSONObject(updateRes.body);
+                            if ("VERSION_MISMATCH".equals(errObj.optString("code"))) {
+                                int sVer = errObj.optInt("server_version", 1);
+                                int cVer = errObj.optInt("client_version", 1);
+                                new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("⚠️ 版本冲突 (Version Mismatch)")
+                                        .setMessage("服务端版本已由其他客户端更新至 v" + sVer + "，而当前本地提交版本为 v" + cVer + "。\n服务端已拒绝修改以保护数据一致性。\n\n请选择处理方式：")
+                                        .setPositiveButton("拉取服务端最新数据覆盖本地", (d, w) -> {
+                                            performSync();
+                                            if (editDialog != null) editDialog.dismiss();
+                                        })
+                                        .setNeutralButton("强制以最新版本号重试覆盖", (d, w) -> {
+                                            item.setVersion(sVer);
+                                            executeServerUpdate(item, editDialog, btnSave);
+                                        })
+                                        .setNegativeButton("取消", null)
+                                        .show();
+                                return;
+                            }
+                        } catch (Exception ignored) {}
+
                         // Server update rejected/failed -> DO NOT modify local DB
                         String errMsg = parseErrorMessage(updateRes.body, "服务端更新拒绝");
                         new AlertDialog.Builder(MainActivity.this)

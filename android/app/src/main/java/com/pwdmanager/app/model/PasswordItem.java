@@ -19,6 +19,7 @@ public class PasswordItem implements Serializable {
     private String createdAt;
     private String updatedAt;
     private int isDeleted;
+    private int version;
 
     public PasswordItem() {
         this.id = UUID.randomUUID().toString();
@@ -31,6 +32,7 @@ public class PasswordItem implements Serializable {
         this.createdAt = now;
         this.updatedAt = now;
         this.isDeleted = 0;
+        this.version = 1;
     }
 
     public static String getIsoNow() {
@@ -50,6 +52,7 @@ public class PasswordItem implements Serializable {
         item.createdAt = json.optString("created_at", getIsoNow());
         item.updatedAt = json.optString("updated_at", getIsoNow());
         item.isDeleted = json.optInt("is_deleted", 0);
+        item.version = json.optInt("version", 1);
         return item;
     }
 
@@ -65,6 +68,7 @@ public class PasswordItem implements Serializable {
             json.put("created_at", createdAt);
             json.put("updated_at", updatedAt);
             json.put("is_deleted", isDeleted);
+            json.put("version", version);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -98,4 +102,7 @@ public class PasswordItem implements Serializable {
 
     public int getIsDeleted() { return isDeleted; }
     public void setIsDeleted(int isDeleted) { this.isDeleted = isDeleted; }
+
+    public int getVersion() { return version; }
+    public void setVersion(int version) { this.version = version; }
 }

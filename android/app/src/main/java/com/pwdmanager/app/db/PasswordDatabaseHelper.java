@@ -12,7 +12,7 @@ import java.util.List;
 public class PasswordDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "pwdmanager_local.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     public static final String TABLE_PASSWORDS = "passwords";
     public static final String COLUMN_ID = "id";
@@ -24,6 +24,7 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_CREATED_AT = "created_at";
     public static final String COLUMN_UPDATED_AT = "updated_at";
     public static final String COLUMN_IS_DELETED = "is_deleted";
+    public static final String COLUMN_VERSION = "version";
 
     private static PasswordDatabaseHelper instance;
 
@@ -49,15 +50,19 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_NOTES + " TEXT, " +
                 COLUMN_CREATED_AT + " TEXT NOT NULL, " +
                 COLUMN_UPDATED_AT + " TEXT NOT NULL, " +
-                COLUMN_IS_DELETED + " INTEGER DEFAULT 0)";
+                COLUMN_IS_DELETED + " INTEGER DEFAULT 0, " +
+                COLUMN_VERSION + " INTEGER DEFAULT 1)";
         db.execSQL(createTable);
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_pwd_updated_at ON " + TABLE_PASSWORDS + " (" + COLUMN_UPDATED_AT + ")");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_PASSWORDS);
-        onCreate(db);
+        if (oldVersion < 3) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE_PASSWORDS + " ADD COLUMN " + COLUMN_VERSION + " INTEGER DEFAULT 1");
+            } catch (Exception ignored) {}
+        }
     }
 
     public synchronized void upsertPassword(PasswordItem item) {
@@ -72,15 +77,19 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_CREATED_AT, item.getCreatedAt());
         values.put(COLUMN_UPDATED_AT, item.getUpdatedAt());
         values.put(COLUMN_IS_DELETED, item.getIsDeleted());
+        values.put(COLUMN_VERSION, Math.max(item.getVersion(), 1));
 
         db.insertWithOnConflict(TABLE_PASSWORDS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
     public synchronized void softDeletePassword(String id) {
         SQLiteDatabase db = getWritableDatabase();
+        PasswordItem existing = getPasswordById(id);
+        int newVersion = (existing != null ? existing.getVersion() + 1 : 1);
         ContentValues values = new ContentValues();
         values.put(COLUMN_IS_DELETED, 1);
         values.put(COLUMN_UPDATED_AT, PasswordItem.getIsoNow());
+        values.put(COLUMN_VERSION, newVersion);
         db.update(TABLE_PASSWORDS, values, COLUMN_ID + " = ?", new String[]{id});
     }
 
@@ -175,6 +184,14 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         item.setCreatedAt(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT)));
         item.setUpdatedAt(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT)));
         item.setIsDeleted(cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_DELETED)));
+
+        int verIdx = cursor.getColumnIndex(COLUMN_VERSION);
+        if (verIdx != -1) {
+            item.setVersion(cursor.getInt(verIdx));
+        } else {
+            item.setVersion(1);
+        }
+
         return item;
     }
 }

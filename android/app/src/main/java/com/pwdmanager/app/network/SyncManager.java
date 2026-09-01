@@ -81,9 +81,20 @@ public class SyncManager {
                         PasswordItem serverItem = PasswordItem.fromJson(rObj);
 
                         PasswordItem localItem = dbHelper.getPasswordById(serverItem.getId());
-                        if (localItem == null || serverItem.getUpdatedAt().compareTo(localItem.getUpdatedAt()) >= 0) {
+                        if (localItem == null) {
                             dbHelper.upsertPassword(serverItem);
                             changedCount++;
+                        } else {
+                            // Version-based arbitration: High version wins (以高版本号为准)
+                            if (serverItem.getVersion() > localItem.getVersion()) {
+                                dbHelper.upsertPassword(serverItem);
+                                changedCount++;
+                            } else if (serverItem.getVersion() == localItem.getVersion()) {
+                                if (serverItem.getUpdatedAt().compareTo(localItem.getUpdatedAt()) >= 0) {
+                                    dbHelper.upsertPassword(serverItem);
+                                    changedCount++;
+                                }
+                            }
                         }
                     }
                 }
@@ -113,6 +124,7 @@ public class SyncManager {
                 if (response.isSuccess) {
                     JSONObject obj = new JSONObject(response.body);
                     PasswordItem savedItem = PasswordItem.fromJson(obj);
+                    savedItem.setPassword(item.getPassword());
                     dbHelper.upsertPassword(savedItem);
                     mainHandler.post(() -> {
                         if (callback != null) callback.onSuccess(savedItem);
