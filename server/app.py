@@ -225,26 +225,24 @@ def init_db():
 
 
 
-    # Default admin user: admin / admin@1234, jason / admin@1234
-    default_users = [
-        ("jason", "admin@1234", "admin"),
-        ("admin", "admin@1234", "admin")
-    ]
-    for u, p, r in default_users:
-        cursor.execute("SELECT username, salt FROM users WHERE username = ?", (u,))
-        row = cursor.fetchone()
-        if not row or not row[1]:  # If missing or legacy unsalted
-            phash, salt = hash_password_pbkdf2(p)
-            token = secrets.token_hex(32)
-            token_exp = get_iso_future(30)
-            now = get_iso_now()
-            cursor.execute("""
-                INSERT INTO users (username, password_hash, salt, role, token, token_expire_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(username) DO UPDATE SET
-                    password_hash=excluded.password_hash, salt=excluded.salt, role=excluded.role,
-                    token=excluded.token, token_expire_at=excluded.token_expire_at, updated_at=excluded.updated_at
-            """, (u, phash, salt, r, token, token_exp, now))
+    # 1. Clean up legacy 'admin' user if primary administrator 'jason' is active
+    cursor.execute("DELETE FROM users WHERE username = 'admin' AND EXISTS (SELECT 1 FROM users WHERE username = 'jason')")
+
+    # 2. Initialize default primary admin (jason / admin@1234) if users table is empty
+    cursor.execute("SELECT username, salt FROM users WHERE username = 'jason'")
+    row = cursor.fetchone()
+    if not row or not row[1]:  # If missing or legacy unsalted
+        phash, salt = hash_password_pbkdf2("admin@1234")
+        token = secrets.token_hex(32)
+        token_exp = get_iso_future(30)
+        now = get_iso_now()
+        cursor.execute("""
+            INSERT INTO users (username, password_hash, salt, role, token, token_expire_at, updated_at)
+            VALUES ('jason', ?, ?, 'admin', ?, ?, ?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash, salt=excluded.salt, role=excluded.role,
+                token=excluded.token, token_expire_at=excluded.token_expire_at, updated_at=excluded.updated_at
+        """, (phash, salt, token, token_exp, now))
 
     # 2. Passwords table
     cursor.execute("""
