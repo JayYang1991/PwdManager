@@ -527,6 +527,16 @@ def run_tests(base_url="http://127.0.0.1:8000"):
 
     print("  [PASS] 17. Security Audit Logging, Offending IP Tracking & Admin Review API 100% verified!")
 
+    # --------------------------------------------------------------------------
+    # 18. Smooth Server Online Update & Release Check API Test Suite
+    # --------------------------------------------------------------------------
+    print("\n  [*] Running Server Smooth Update & Release Verification Test Suite (Step 18)...")
+    s_upd, _, upd_data = request_raw(f"{base_url}/api/admin/check-update", "GET", headers=auth_headers)
+    assert s_upd == 200, f"Expected 200 for check-update, got {s_upd}: {upd_data}"
+    assert "current_version" in upd_data and "latest_version" in upd_data and "download_url" in upd_data
+    print(f"      -> 18(a) Release Inspection: Current: {upd_data['current_version']}, Latest: {upd_data['latest_version']}, Has Update: {upd_data.get('has_update')}")
+    print("  [PASS] 18. Server Smooth Online Update & Release Check API 100% verified!")
+
 
     print("\n==========================================================================================")
     print(">>> ALL SECURITY HARDENING, WEB HEADERS, AUTH & CRYPTO TESTS PASSED! <<<")

@@ -141,6 +141,13 @@ mkdir -p "$INSTALL_DIR" "$INSTALL_DIR/download"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cp "$SCRIPT_DIR/app.py" "$INSTALL_DIR/"
+if [ -f "$SCRIPT_DIR/update_server.sh" ]; then
+    cp "$SCRIPT_DIR/update_server.sh" "$INSTALL_DIR/"
+    chmod +x "$INSTALL_DIR/update_server.sh"
+    if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ] || [ "$EUID" -eq 0 ] || [ -n "$SUDO" ]; then
+        $SUDO ln -sf "$INSTALL_DIR/update_server.sh" /usr/local/bin/pwdmanager-update 2>/dev/null || true
+    fi
+fi
 if [ -f "$SCRIPT_DIR/download/PwdManager.apk" ]; then
     cp "$SCRIPT_DIR/download/PwdManager.apk" "$INSTALL_DIR/download/"
 fi
@@ -149,7 +156,7 @@ chmod +x "$INSTALL_DIR/app.py"
 if [ -n "$SUDO" ] || [ "$EUID" -eq 0 ]; then
     chown -R "$RUN_USER" "$INSTALL_DIR" 2>/dev/null || true
 fi
-echo "  ✅ 文件已就绪: $INSTALL_DIR/app.py"
+echo "  ✅ 文件已就绪: $INSTALL_DIR/app.py, $INSTALL_DIR/update_server.sh"
 
 # ==============================================================================
 # 3. 配置并启动 Systemd 服务 (Systemd Service Setup)

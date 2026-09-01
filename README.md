@@ -21,7 +21,23 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/install
 
 ---
 
-### 2. 服务端一键完全卸载与清理 (Linux)
+### 2. 服务端从 GitHub Release 一键平滑更新 (保留所有数据)
+服务端安装完成后，支持通过三种方式随时从 GitHub Release 拉取最新发布包进行无缝升级。**系统在更新前将自动备份数据库快照，确保数据、密码记录及私钥 100% 完整无损**：
+
+- **方式一（Web 管理控制台一键更新）**：
+  登录 Web 控制台，点击顶部导航栏的 <kbd><i class="fa-solid fa-cloud-arrow-down"></i> 检查更新</kbd> 按钮，查看版本对比与更新日志，点击「**立即平滑更新 (保留数据)**」即可完成在线升级并自动刷新。
+- **方式二（服务器快捷命令更新）**：
+  ```bash
+  sudo pwdmanager-update
+  ```
+- **方式三（在线远程脚本更新）**：
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/update_server.sh | sudo bash
+  ```
+
+---
+
+### 3. 服务端一键完全卸载与清理 (Linux)
 若需卸载服务端并清理所有数据与系统服务，执行：
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/uninstall_server.sh | sudo bash
@@ -29,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/uninsta
 
 ---
 
-### 3. 安卓客户端 (APP) 下载与使用
+### 4. 安卓客户端 (APP) 下载与使用
 - **方式一（服务端网页直接下载）**：在浏览器打开 `http://<服务器IP>:8000/download/app.apk`
 - **方式二（GitHub Release 下载）**：从 [Releases 页面](https://github.com/JayYang1991/PwdManager/releases) 下载最新的 `PwdManager.apk`
 
@@ -40,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/JayYang1991/PwdManager/main/uninsta
 
 ---
 
-### 4. 本地一键编译与打包
+### 5. 本地一键编译与打包
 ```bash
 # 本地编译打包 Android APK (带永久签名) 与服务端发布包 (输出至 dist/)
 ./build_all.sh

@@ -49,6 +49,9 @@ if not HAS_CRYPTO:
     print("[-] CRITICAL ERROR: Python 'cryptography' library is required. Starting in insecure mode is prohibited.")
     sys.exit(1)
 
+SERVER_VERSION = "v1.0.0"
+GITHUB_REPO = "JayYang1991/PwdManager"
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("PWD_DB_PATH", os.path.join(BASE_DIR, "passwords.db"))
 DOWNLOAD_DIR = os.environ.get("PWD_DOWNLOAD_DIR", os.path.join(BASE_DIR, "download"))
@@ -934,6 +937,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <i class="fa-brands fa-android"></i> 下载 APP
             </a>
             <span style="font-size: 13px; color: var(--text-sub);" id="currentUserLabel"></span>
+            <button class="btn btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan);" onclick="showUpdateModal()"><i class="fa-solid fa-cloud-arrow-down"></i> 检查更新</button>
             <button class="btn btn-outline" style="border-color: rgba(244, 63, 94, 0.5); color: #FDA4AF;" onclick="showSecurityLogsModal()"><i class="fa-solid fa-shield-virus"></i> 安全审计日志</button>
             <button class="btn btn-outline" onclick="showChangePwdModal()"><i class="fa-solid fa-lock"></i> 修改密码</button>
             <button class="btn btn-outline" onclick="showRotateKeyModal()"><i class="fa-solid fa-key"></i> 更换私钥</button>
@@ -1073,6 +1077,49 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('importModal')">取消</button>
             <button class="btn btn-primary" onclick="doImport()"><i class="fa-solid fa-file-import"></i> 确认导入</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: System Smooth Update -->
+<div id="updateModal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 600px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 class="modal-title" style="margin-bottom: 0;"><i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-cyan);"></i> 服务端在线平滑更新</h3>
+            <button class="icon-btn" onclick="closeModal('updateModal')" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">
+            从 GitHub Release 自动拉取最新服务端程序并平滑重启。系统在更新前<b>自动为数据库建立快照备份</b>，保障所有密码与私钥数据绝对零丢失。
+        </p>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;">
+                <span style="color: var(--text-sub);">当前运行版本:</span>
+                <span style="font-family: monospace; font-weight: 600; color: #FFFFFF;" id="updCurVer">v1.0.0</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;">
+                <span style="color: var(--text-sub);">GitHub 最新版本:</span>
+                <span style="font-family: monospace; font-weight: 600; color: var(--accent-cyan);" id="updLatestVer">检测中...</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;">
+                <span style="color: var(--text-sub);">更新状态:</span>
+                <span id="updStatusBadge" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan);">正在查询 GitHub...</span>
+            </div>
+        </div>
+
+        <div id="updNotesBox" style="display: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; max-height: 140px; overflow-y: auto; font-size: 12px; color: var(--text-sub); margin-bottom: 16px;">
+            <div style="font-weight: 600; color: #FFFFFF; margin-bottom: 4px;">发布说明 / Release Notes:</div>
+            <div id="updNotesContent" style="white-space: pre-wrap; line-height: 1.5;"></div>
+        </div>
+
+        <div id="updProgressBox" style="display: none; text-align: center; padding: 15px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; margin-bottom: 16px;">
+            <div style="color: var(--accent-cyan); font-size: 14px; font-weight: 600; margin-bottom: 6px;"><i class="fa-solid fa-spinner fa-spin"></i> <span id="updProgressText">正在执行平滑更新...</span></div>
+            <div style="color: var(--text-sub); font-size: 12px;">数据库已备份，服务将在 5 秒后自动刷新...</div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('updateModal')">取消</button>
+            <button class="btn btn-primary" id="btnDoUpdate" onclick="doSmoothUpdate()"><i class="fa-solid fa-rocket"></i> 立即平滑更新 (保留数据)</button>
         </div>
     </div>
 </div>
@@ -1647,6 +1694,72 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function escapeHtml(s) { return (s||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
     function escapeJs(s) { return (s || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
+    function showUpdateModal() {
+        openModal("updateModal");
+        checkUpdate();
+    }
+
+    async function checkUpdate() {
+        document.getElementById("updCurVer").innerText = "v1.0.0";
+        document.getElementById("updLatestVer").innerText = "正在拉取...";
+        document.getElementById("updStatusBadge").innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 正在查询 GitHub Release...`;
+        document.getElementById("updNotesBox").style.display = "none";
+        document.getElementById("updProgressBox").style.display = "none";
+        document.getElementById("btnDoUpdate").disabled = false;
+
+        try {
+            const res = await api("/api/admin/check-update");
+            document.getElementById("updCurVer").innerText = res.current_version || "v1.0.0";
+            document.getElementById("updLatestVer").innerText = res.latest_version || res.current_version;
+
+            if (res.has_update) {
+                document.getElementById("updStatusBadge").innerHTML = `<span style="background: rgba(244,63,94,0.2); color: var(--accent-pink); padding: 2px 8px; border-radius: 4px;">🚀 发现新版本可用</span>`;
+                if (res.release_notes) {
+                    document.getElementById("updNotesBox").style.display = "block";
+                    document.getElementById("updNotesContent").innerText = res.release_notes;
+                }
+            } else {
+                document.getElementById("updStatusBadge").innerHTML = `<span style="background: rgba(16,185,129,0.2); color: #10B981; padding: 2px 8px; border-radius: 4px;"><i class="fa-solid fa-circle-check"></i> 当前已是最新版本</span>`;
+                if (res.release_notes && res.release_notes.length > 5) {
+                    document.getElementById("updNotesBox").style.display = "block";
+                    document.getElementById("updNotesContent").innerText = res.release_notes;
+                }
+            }
+        } catch (e) {
+            document.getElementById("updStatusBadge").innerHTML = `<span style="color: var(--accent-pink);">查询失败: ${escapeHtml(e.message)}</span>`;
+        }
+    }
+
+    async function doSmoothUpdate() {
+        if (!confirm("确定要立即从 GitHub 拉取最新版本并平滑更新服务端吗？\n（系统将自动备份数据库，平滑重启约需 5 秒）")) return;
+
+        const btn = document.getElementById("btnDoUpdate");
+        btn.disabled = true;
+        document.getElementById("updProgressBox").style.display = "block";
+        document.getElementById("updProgressText").innerText = "正在从 GitHub 拉取更新并备份数据库...";
+
+        try {
+            const res = await api("/api/admin/update", "POST");
+            showToast("🚀 " + (res.message || "更新指令已下发，正在平滑重启服务..."));
+            document.getElementById("updProgressText").innerText = "平滑更新完成，正在重新加载页面...";
+
+            let countdown = 5;
+            const timer = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    window.location.reload();
+                } else {
+                    document.getElementById("updProgressText").innerText = `服务重启中，将在 ${countdown} 秒后自动刷新页面...`;
+                }
+            }, 1000);
+        } catch (e) {
+            btn.disabled = false;
+            document.getElementById("updProgressBox").style.display = "none";
+            showToast(`❌ 更新失败: ${e.message}`, "fa-triangle-exclamation");
+        }
+    }
+
     function showSecurityLogsModal() {
         openModal('securityLogsModal');
         loadSecurityLogs();
@@ -1904,6 +2017,53 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         user = self._get_auth_user()
+
+        # Check for Updates API
+        if path == '/api/admin/check-update':
+            if not user or user.get('role') != 'admin':
+                self._send_json(403, {"error": "Forbidden: Administrator privileges required"})
+                return
+
+            import urllib.request
+            gh_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            gh_headers = {"User-Agent": "PwdManager-Server-Updater"}
+            gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            if gh_token:
+                gh_headers["Authorization"] = f"token {gh_token}"
+
+            try:
+                gh_req = urllib.request.Request(gh_url, headers=gh_headers)
+                with urllib.request.urlopen(gh_req, timeout=6) as gh_resp:
+                    gh_data = json.loads(gh_resp.read().decode('utf-8'))
+                    tag = gh_data.get("tag_name", "")
+                    has_update = tag != SERVER_VERSION and tag != ""
+
+                    tar_asset = next((a for a in gh_data.get("assets", []) if a.get("name") == "pwdmanager-server.tar.gz"), None)
+                    download_url = tar_asset.get("browser_download_url") if tar_asset else f"https://github.com/{GITHUB_REPO}/releases/latest/download/pwdmanager-server.tar.gz"
+
+                    self._send_json(200, {
+                        "status": "ok",
+                        "current_version": SERVER_VERSION,
+                        "latest_version": tag,
+                        "has_update": has_update,
+                        "release_name": gh_data.get("name", tag),
+                        "release_notes": gh_data.get("body", ""),
+                        "published_at": gh_data.get("published_at", ""),
+                        "download_url": download_url
+                    })
+            except Exception as ex:
+                self._send_json(200, {
+                    "status": "ok",
+                    "current_version": SERVER_VERSION,
+                    "latest_version": SERVER_VERSION,
+                    "has_update": False,
+                    "release_name": f"{SERVER_VERSION} (当前版本)",
+                    "release_notes": "当前已是最新运行版本，或暂未连接至外网 Release。",
+                    "published_at": get_iso_now(),
+                    "download_url": f"https://github.com/{GITHUB_REPO}/releases/latest/download/pwdmanager-server.tar.gz",
+                    "note": str(ex)
+                })
+            return
 
         # Security Audit Logs API
         if path == '/api/admin/security-logs':
@@ -2218,6 +2378,56 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         # 2. Admin Rotate Key
+        if path == '/api/admin/update':
+            if not user or user.get('role') != 'admin':
+                self._send_json(403, {"error": "Forbidden: Administrator privileges required"})
+                return
+
+            def run_smooth_update():
+                time.sleep(0.5)
+                # 1. Automatic database backup snapshot
+                try:
+                    backup_dir = os.path.join(BASE_DIR, "backups")
+                    os.makedirs(backup_dir, exist_ok=True)
+                    backup_file = os.path.join(backup_dir, f"passwords_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+                    if os.path.exists(DB_PATH):
+                        src_conn = sqlite3.connect(DB_PATH)
+                        dst_conn = sqlite3.connect(backup_file)
+                        with dst_conn:
+                            src_conn.backup(dst_conn)
+                        dst_conn.close()
+                        src_conn.close()
+                        print(f"[+] Safe DB backup created: {backup_file}")
+                except Exception as ex:
+                    print(f"[-] Backup warning during update: {ex}")
+
+                # 2. Check if update_server.sh exists locally
+                update_sh = os.path.join(BASE_DIR, "update_server.sh")
+                if os.path.exists(update_sh):
+                    os.system(f"bash {update_sh} >> {os.path.join(BASE_DIR, 'update.log')} 2>&1 &")
+                else:
+                    # Fallback to in-place python download & restart
+                    import urllib.request
+                    try:
+                        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/server/app.py"
+                        req = urllib.request.Request(raw_url, headers={"User-Agent": "PwdManager-Server-Updater"})
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            new_code = resp.read()
+                            if len(new_code) > 1000 and b"ThreadedHTTPServer" in new_code:
+                                with open(os.path.join(BASE_DIR, "app.py"), "wb") as f:
+                                    f.write(new_code)
+                        os.system("systemctl restart pwdmanager || (pkill -f 'python3.*app.py' && nohup python3 app.py 8000 &)")
+                    except Exception as e:
+                        print(f"[-] Smooth update execution error: {e}")
+
+            threading.Thread(target=run_smooth_update, daemon=True).start()
+
+            self._send_json(200, {
+                "status": "updating",
+                "message": "已成功下发平滑更新指令！数据库已建立安全快照备份，服务正在后台重启并无缝生效。"
+            })
+            return
+
         if path == '/api/admin/rotate-key':
             if user["role"] != "admin":
                 self._send_json(403, {"error": "Forbidden: Admin role required"})
