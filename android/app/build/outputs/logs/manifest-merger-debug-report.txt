@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-29:12
-INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-29:12
-INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-29:12
-INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-29:12
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-30:12
+INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:2:1-30:12
 MERGED from [com.google.android.material:material:1.11.0] /home/jason/.gradle/caches/transforms-3/2b09c2cd4192fe4b7b686a651ae8eff3/transformed/material-1.11.0/AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] /home/jason/.gradle/caches/transforms-3/80bc2211690f56e6063d66d7e4cf0117/transformed/constraintlayout-2.1.4/AndroidManifest.xml:2:1-11:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/jason/.gradle/caches/transforms-3/68b491ffcc6cd52d6dfc071349a68223/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
@@ -64,8 +64,8 @@ ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:
 	android:name
 		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:5:22-76
 application
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:7:5-27:19
-INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:7:5-27:19
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:7:5-28:19
+INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:7:5-28:19
 MERGED from [com.google.android.material:material:1.11.0] /home/jason/.gradle/caches/transforms-3/2b09c2cd4192fe4b7b686a651ae8eff3/transformed/material-1.11.0/AndroidManifest.xml:22:5-20
 MERGED from [com.google.android.material:material:1.11.0] /home/jason/.gradle/caches/transforms-3/2b09c2cd4192fe4b7b686a651ae8eff3/transformed/material-1.11.0/AndroidManifest.xml:22:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] /home/jason/.gradle/caches/transforms-3/80bc2211690f56e6063d66d7e4cf0117/transformed/constraintlayout-2.1.4/AndroidManifest.xml:9:5-20
@@ -87,39 +87,41 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /home/jason/.gradle/caches/
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.9.0] /home/jason/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:12:9-35
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:13:9-35
 	android:label
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:10:9-41
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:11:9-41
+	android:fullBackupContent
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:9:9-42
 	android:roundIcon
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:11:9-54
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:12:9-54
 	android:icon
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:9:9-43
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:10:9-43
 	android:allowBackup
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:8:9-35
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:8:9-36
 	android:theme
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:13:9-48
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:14:9-48
 	android:networkSecurityConfig
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:15:9-69
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:16:9-69
 	android:usesCleartextTraffic
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:14:9-44
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:15:9-44
 activity#com.pwdmanager.app.ui.MainActivity
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:17:9-25:20
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:18:9-26:20
 	android:windowSoftInputMode
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:20:13-55
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:21:13-55
 	android:exported
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:19:13-36
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:20:13-36
 	android:name
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:18:13-44
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:19:13-44
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:21:13-24:29
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:22:13-25:29
 action#android.intent.action.MAIN
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:22:17-69
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:23:17-69
 	android:name
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:22:25-66
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:23:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:23:17-77
+ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:24:17-77
 	android:name
-		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:23:27-74
+		ADDED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml:24:27-74
 uses-sdk
 INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/jason/code/PwdManager/android/app/src/main/AndroidManifest.xml
