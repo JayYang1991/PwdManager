@@ -51,7 +51,7 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_CREATED_AT + " TEXT NOT NULL, " +
                 COLUMN_UPDATED_AT + " TEXT NOT NULL, " +
                 COLUMN_IS_DELETED + " INTEGER DEFAULT 0, " +
-                COLUMN_VERSION + " INTEGER DEFAULT 1)";
+                COLUMN_VERSION + " INTEGER DEFAULT 0)";
         db.execSQL(createTable);
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_pwd_updated_at ON " + TABLE_PASSWORDS + " (" + COLUMN_UPDATED_AT + ")");
     }
@@ -60,7 +60,7 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 3) {
             try {
-                db.execSQL("ALTER TABLE " + TABLE_PASSWORDS + " ADD COLUMN " + COLUMN_VERSION + " INTEGER DEFAULT 1");
+                db.execSQL("ALTER TABLE " + TABLE_PASSWORDS + " ADD COLUMN " + COLUMN_VERSION + " INTEGER DEFAULT 0");
             } catch (Exception ignored) {}
         }
     }
@@ -77,7 +77,7 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_CREATED_AT, item.getCreatedAt());
         values.put(COLUMN_UPDATED_AT, item.getUpdatedAt());
         values.put(COLUMN_IS_DELETED, item.getIsDeleted());
-        values.put(COLUMN_VERSION, Math.max(item.getVersion(), 1));
+        values.put(COLUMN_VERSION, Math.max(item.getVersion(), 0));
 
         db.insertWithOnConflict(TABLE_PASSWORDS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
@@ -189,7 +189,7 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         if (verIdx != -1) {
             item.setVersion(cursor.getInt(verIdx));
         } else {
-            item.setVersion(1);
+            item.setVersion(0);
         }
 
         return item;

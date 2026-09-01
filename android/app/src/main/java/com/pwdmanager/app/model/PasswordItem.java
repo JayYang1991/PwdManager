@@ -32,7 +32,7 @@ public class PasswordItem implements Serializable {
         this.createdAt = now;
         this.updatedAt = now;
         this.isDeleted = 0;
-        this.version = 1;
+        this.version = 0;
     }
 
     public static String getIsoNow() {
@@ -52,7 +52,7 @@ public class PasswordItem implements Serializable {
         item.createdAt = json.optString("created_at", getIsoNow());
         item.updatedAt = json.optString("updated_at", getIsoNow());
         item.isDeleted = json.optInt("is_deleted", 0);
-        item.version = json.optInt("version", 1);
+        item.version = json.optInt("version", 0);
         return item;
     }
 

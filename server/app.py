@@ -196,7 +196,7 @@ def init_db():
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             is_deleted INTEGER DEFAULT 0,
-            version INTEGER NOT NULL DEFAULT 1
+            version INTEGER NOT NULL DEFAULT 0
         )
     """)
     cursor.execute("""
@@ -206,7 +206,7 @@ def init_db():
     cursor.execute("PRAGMA table_info(password_entries)")
     pwd_cols = [row[1] for row in cursor.fetchall()]
     if 'version' not in pwd_cols:
-        cursor.execute("ALTER TABLE password_entries ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        cursor.execute("ALTER TABLE password_entries ADD COLUMN version INTEGER NOT NULL DEFAULT 0")
     
     # 3. Server Config & Key History tables
     cursor.execute("""
@@ -1062,7 +1062,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             card.innerHTML = `
                 <div class="card-header">
                     <div>
-                        <div class="card-title">${escapeHtml(r.name)} <span style="font-size: 11px; background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); padding: 2px 7px; border-radius: 4px; font-weight: normal;">v${r.version || 1}</span></div>
+                        <div class="card-title">${escapeHtml(r.name)} <span style="font-size: 11px; background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); padding: 2px 7px; border-radius: 4px; font-weight: normal;">v${r.version !== undefined ? r.version : 0}</span></div>
                         ${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" class="card-url"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(r.url)}</a>` : ""}
                     </div>
                     <div class="card-actions">
@@ -1089,7 +1089,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
     function showAddModal() {
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-shield-cat" style="color: var(--accent-cyan);"></i> 添加密码记录`;
         document.getElementById("editId").value = "";
-        document.getElementById("mVersion").value = "1";
+        document.getElementById("mVersion").value = "0";
         document.getElementById("mName").value = "";
         document.getElementById("mUrl").value = "";
         document.getElementById("mUsername").value = "";
@@ -1103,7 +1103,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         if (!item) return;
         document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-pen-to-square" style="color: var(--accent-cyan);"></i> 编辑密码记录`;
         document.getElementById("editId").value = item.id;
-        document.getElementById("mVersion").value = item.version || 1;
+        document.getElementById("mVersion").value = item.version !== undefined ? item.version : 0;
         document.getElementById("mName").value = item.name;
         document.getElementById("mUrl").value = item.url || "";
         document.getElementById("mUsername").value = item.username || "";
@@ -1125,7 +1125,7 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
 
-        const version = parseInt(document.getElementById("mVersion").value) || 1;
+        const version = parseInt(document.getElementById("mVersion").value) >= 0 ? parseInt(document.getElementById("mVersion").value) : 0;
         const payload = { name, url, username, password, notes, version };
         if (id) {
             payload.id = id;
@@ -1752,7 +1752,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = r.get('iv', '')
                     r_salt = r.get('salt', '')
 
-                r_version = int(r.get('version', 1))
+                r_version = int(r.get('version', 0))
                 cursor.execute("""
                     INSERT INTO password_entries (
                         id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
@@ -1819,7 +1819,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许重复添加！"})
                 return
 
-            version = int(body.get('version', 1))
+            version = int(body.get('version', 0))
             cursor.execute("""
                 INSERT INTO password_entries (
                     id, name, url, username, encrypted_password, iv, salt, notes, created_at, updated_at, is_deleted, version
@@ -1869,7 +1869,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = record.get('iv', '')
                     r_salt = record.get('salt', '')
 
-                r_version = int(record.get('version', 1))
+                r_version = int(record.get('version', 0))
                 cursor.execute("SELECT version, updated_at FROM password_entries WHERE id = ?", (r_id,))
                 existing = cursor.fetchone()
 

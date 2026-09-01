@@ -252,7 +252,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
                                         headers=auth_headers)
     assert status == 201
     occ_id = occ_create["id"]
-    assert occ_create.get("version") == 1, f"Expected initial version 1, got {occ_create.get('version')}"
+    assert occ_create.get("version") == 0, f"Expected initial version 0, got {occ_create.get('version')}"
 
     # (a) Mismatching version -> must return 409 Conflict with VERSION_MISMATCH
     status, _, occ_mismatch = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
@@ -267,19 +267,19 @@ def run_tests(base_url="http://127.0.0.1:8000"):
                                         headers=auth_headers)
     assert status == 400, f"Expected 400 Bad Request for missing version, got {status}: {occ_no_ver}"
 
-    # (c) Correct version 1 -> atomic update, version incremented to 2
+    # (c) Correct version 0 -> atomic update, version incremented to 1
     status, _, occ_update1 = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
-                                         {"name": occ_name, "password": "OCCPassword#2", "version": 1},
+                                         {"name": occ_name, "password": "OCCPassword#2", "version": 0},
                                          headers=auth_headers)
     assert status == 200, f"Expected 200 for valid version update, got {status}: {occ_update1}"
-    assert occ_update1.get("version") == 2, f"Expected version 2 after first update, got {occ_update1.get('version')}"
+    assert occ_update1.get("version") == 1, f"Expected version 1 after first update, got {occ_update1.get('version')}"
 
-    # (d) Second atomic update with version 2 -> version incremented to 3
+    # (d) Second atomic update with version 1 -> version incremented to 2
     status, _, occ_update2 = request_raw(f"{base_url}/api/passwords/{occ_id}", "PUT",
-                                         {"name": occ_name, "password": "OCCPassword#3", "version": 2},
+                                         {"name": occ_name, "password": "OCCPassword#3", "version": 1},
                                          headers=auth_headers)
     assert status == 200
-    assert occ_update2.get("version") == 3, f"Expected version 3 after second update, got {occ_update2.get('version')}"
+    assert occ_update2.get("version") == 2, f"Expected version 2 after second update, got {occ_update2.get('version')}"
 
     # (e) Sync Arbitration: Client sends higher version (v10) -> server adopts v10
     sync_high_payload = {
