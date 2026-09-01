@@ -126,41 +126,45 @@ public class ApiClient {
     public static HttpResponse requestRaw(String urlString, String method, JSONObject jsonBody, String token) throws Exception {
         URL url = new URL(urlString);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod(method);
-        conn.setConnectTimeout(6000);
-        conn.setReadTimeout(8000);
-        conn.setRequestProperty("Accept", "application/json");
+        try {
+            conn.setRequestMethod(method);
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(8000);
+            conn.setRequestProperty("Accept", "application/json");
 
-        if (token != null && !token.isEmpty()) {
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setRequestProperty("X-Auth-Token", token);
-        }
-
-        if (jsonBody != null && ("POST".equals(method) || "PUT".equals(method))) {
-            conn.setDoOutput(true);
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            byte[] outputBytes = jsonBody.toString().getBytes("UTF-8");
-            conn.setFixedLengthStreamingMode(outputBytes.length);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(outputBytes);
-                os.flush();
+            if (token != null && !token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+                conn.setRequestProperty("X-Auth-Token", token);
             }
-        }
 
-        int responseCode = conn.getResponseCode();
-        InputStream is = (responseCode >= 200 && responseCode < 400) ? conn.getInputStream() : conn.getErrorStream();
-
-        StringBuilder sb = new StringBuilder();
-        if (is != null) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
+            if (jsonBody != null && ("POST".equals(method) || "PUT".equals(method))) {
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                byte[] outputBytes = jsonBody.toString().getBytes("UTF-8");
+                conn.setFixedLengthStreamingMode(outputBytes.length);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(outputBytes);
+                    os.flush();
                 }
             }
-        }
 
-        return new HttpResponse(responseCode, sb.toString());
+            int responseCode = conn.getResponseCode();
+            InputStream is = (responseCode >= 200 && responseCode < 400) ? conn.getInputStream() : conn.getErrorStream();
+
+            StringBuilder sb = new StringBuilder();
+            if (is != null) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+            }
+
+            return new HttpResponse(responseCode, sb.toString());
+        } finally {
+            conn.disconnect();
+        }
     }
 
     // --- Password CRUD Server Operations ---

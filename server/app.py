@@ -27,6 +27,11 @@ import base64
 import time
 from datetime import datetime, timezone, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
 from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
 
@@ -119,6 +124,11 @@ def is_rate_limited(client_ip: str) -> bool:
     # Filter attempts within lockout window
     attempts = [t for t in FAILED_ATTEMPTS[client_ip] if now - t < LOCKOUT_DURATION]
     FAILED_ATTEMPTS[client_ip] = attempts
+    # Periodic memory pruning if dictionary size exceeds threshold
+    if len(FAILED_ATTEMPTS) > 500:
+        stale_keys = [ip for ip, atts in FAILED_ATTEMPTS.items() if not atts or now - atts[-1] >= LOCKOUT_DURATION]
+        for ip in stale_keys:
+            FAILED_ATTEMPTS.pop(ip, None)
     return len(attempts) >= MAX_FAILED_ATTEMPTS
 
 def record_failed_attempt(client_ip: str):
@@ -238,8 +248,10 @@ def init_db():
     conn.close()
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=30000;")
     return conn
 
 
@@ -2221,16 +2233,23 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE password_entries SET is_deleted = 1, updated_at = ? WHERE id = ?", (now, entry_id))
+        cursor.execute("SELECT id FROM password_entries WHERE id = ? AND is_deleted = 0", (entry_id,))
+        if not cursor.fetchone():
+            conn.close()
+            self._send_json(404, {"error": "Record not found or already deleted"})
+            return
+
+        success, new_gv = increment_global_version(conn)
+        cursor.execute("UPDATE password_entries SET is_deleted = 1, updated_at = ?, version = ? WHERE id = ?", (now, new_gv, entry_id))
         conn.commit()
         conn.close()
 
-        self._send_json(200, {"success": True, "id": entry_id, "deleted_at": now})
+        self._send_json(200, {"success": True, "id": entry_id, "deleted_at": now, "global_version": new_gv})
 
 def run_server(port=8000, host="0.0.0.0"):
     init_db()
     server_address = (host, port)
-    httpd = HTTPServer(server_address, RequestHandler)
+    httpd = ThreadedHTTPServer(server_address, RequestHandler)
     print(f"Password Manager Server & Web Dashboard (Security Hardened) running on http://{host}:{port}")
     try:
         httpd.serve_forever()

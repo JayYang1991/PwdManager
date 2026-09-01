@@ -164,4 +164,10 @@ public class SyncManager {
             }
         });
     }
+
+    public void shutdown() {
+        try {
+            executor.shutdown();
+        } catch (Exception ignored) {}
+    }
 }

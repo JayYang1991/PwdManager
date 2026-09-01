@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     private PasswordDatabaseHelper dbHelper;
     private SyncManager syncManager;
     private String currentSearchQuery = "";
+    private final java.util.concurrent.ExecutorService bgExecutor = Executors.newCachedThreadPool();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,7 +224,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 newItem.setUpdatedAt(PasswordItem.getIsoNow());
                 newItem.setIsDeleted(0);
 
-                Executors.newSingleThreadExecutor().execute(() -> {
+                bgExecutor.execute(() -> {
                     try {
                         ApiClient.HttpResponse res = ApiClient.createPassword(MainActivity.this, newItem);
                         runOnUiThread(() -> {
@@ -282,7 +283,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 itemToUpdate.setUpdatedAt(PasswordItem.getIsoNow());
                 itemToUpdate.setIsDeleted(0);
 
-                Executors.newSingleThreadExecutor().execute(() -> {
+                bgExecutor.execute(() -> {
                     try {
                         // Check server baseline for conflict detection
                         ApiClient.HttpResponse checkRes = ApiClient.getSinglePassword(MainActivity.this, itemToUpdate.getId(), true);
@@ -321,7 +322,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     private void executeServerUpdate(PasswordItem item, AlertDialog editDialog, Button btnSave) {
         long currentGv = dbHelper.getGlobalVersion();
         item.setVersion((int) (currentGv & 0x7FFFFFFF)); // compatibility
-        Executors.newSingleThreadExecutor().execute(() -> {
+        bgExecutor.execute(() -> {
             try {
                 JSONObject payload = item.toJson();
                 payload.put("version", currentGv);
@@ -363,7 +364,8 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                         // Check if it's a version mismatch conflict
                         try {
                             JSONObject errObj = new JSONObject(updateRes.body);
-                            if ("VERSION_MISMATCH".equals(errObj.optString("code"))) {
+                            String code = errObj.optString("code");
+                            if ("VERSION_MISMATCH".equals(code) || "CONCURRENT_CONFLICT".equals(code)) {
                                 long sVer = errObj.optLong("server_version", 0L);
                                 long cVer = errObj.optLong("client_version", currentGv);
                                 new AlertDialog.Builder(MainActivity.this)
@@ -470,7 +472,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
             String testUser = etServerUser.getText() != null ? etServerUser.getText().toString().trim() : "";
             String testPass = etServerPass.getText() != null ? etServerPass.getText().toString().trim() : "";
             tvResult.setText("正在测试鉴权...");
-            Executors.newSingleThreadExecutor().execute(() -> {
+            bgExecutor.execute(() -> {
                 boolean ok = ApiClient.login(this, testUrl, testUser, testPass);
                 runOnUiThread(() -> {
                     if (ok) {
@@ -503,7 +505,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 ApiClient.setPassword(this, newPass);
                 ApiClient.setAuthToken(this, null); // Clear old token to force fresh login
 
-                Executors.newSingleThreadExecutor().execute(() -> {
+                bgExecutor.execute(() -> {
                     ApiClient.login(this, newUrl, newUser, newPass);
                     runOnUiThread(() -> {
                         Toast.makeText(MainActivity.this, "配置已更新并已鉴权", Toast.LENGTH_SHORT).show();
@@ -551,7 +553,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 return;
             }
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            bgExecutor.execute(() -> {
                 try {
                     ApiClient.HttpResponse res = ApiClient.changeAdminPassword(this, oldPass, newPass);
                     runOnUiThread(() -> {
@@ -577,7 +579,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     }
 
     private void showMasterKeyDialog() {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        bgExecutor.execute(() -> {
             try {
                 ApiClient.HttpResponse res = ApiClient.getMasterKey(this);
                 runOnUiThread(() -> {
@@ -612,7 +614,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
     }
 
     private void showExportBackupDialog() {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        bgExecutor.execute(() -> {
             try {
                 ApiClient.HttpResponse res = ApiClient.exportBackup(this);
                 runOnUiThread(() -> {
@@ -668,7 +670,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 return;
             }
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            bgExecutor.execute(() -> {
                 try {
                     ApiClient.HttpResponse res = ApiClient.importBackup(this, customKey, rawJson);
                     runOnUiThread(() -> {
@@ -711,7 +713,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
         Button btnSave = dialogView.findViewById(R.id.btnRotSave);
 
         // Fetch current master key to prefill
-        Executors.newSingleThreadExecutor().execute(() -> {
+        bgExecutor.execute(() -> {
             try {
                 ApiClient.HttpResponse res = ApiClient.getMasterKey(this);
                 if (res.isSuccess) {
@@ -744,7 +746,7 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 return;
             }
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            bgExecutor.execute(() -> {
                 try {
                     ApiClient.HttpResponse res = ApiClient.rotateMasterKey(this, oldKey, newKey, reencrypt);
                     runOnUiThread(() -> {
@@ -803,4 +805,16 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 .setNegativeButton("取消", null)
                 .show();
     }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            bgExecutor.shutdown();
+            if (syncManager != null) {
+                syncManager.shutdown();
+            }
+        } catch (Exception ignored) {}
+    }
+
 }

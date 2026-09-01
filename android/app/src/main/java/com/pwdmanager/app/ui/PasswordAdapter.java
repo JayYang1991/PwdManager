@@ -77,11 +77,13 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
             holder.tvUrl.setVisibility(View.GONE);
         }
 
-        holder.tvUsername.setText(item.getUsername().isEmpty() ? "(未填写)" : item.getUsername());
+        String u = item.getUsername();
+        holder.tvUsername.setText((u == null || u.trim().isEmpty()) ? "(未填写)" : u);
 
         boolean isRevealed = revealedPasswordIds.contains(item.getId());
+        String p = item.getPassword();
         if (isRevealed) {
-            holder.tvPassword.setText(item.getPassword().isEmpty() ? "(空密码)" : item.getPassword());
+            holder.tvPassword.setText((p == null || p.isEmpty()) ? "(空密码)" : p);
             holder.btnTogglePassword.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
         } else {
             holder.tvPassword.setText("••••••••••••");
@@ -94,7 +96,10 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
             } else {
                 revealedPasswordIds.add(item.getId());
             }
-            notifyItemChanged(holder.getAdapterPosition());
+            int pos = holder.getBindingAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION) {
+                notifyItemChanged(pos);
+            }
         });
 
         holder.btnCopyUsername.setOnClickListener(v -> {

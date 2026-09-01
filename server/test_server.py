@@ -347,7 +347,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
     assert len(successes) == 1, f"Expected exactly 1 winner out of {num_clients} concurrent edits, got {len(successes)}"
     assert len(conflicts) == num_clients - 1, f"Expected {num_clients - 1} 409 Conflict rejections, got {len(conflicts)}"
     for _, c_res in conflicts:
-        assert c_res[2].get("code") == "VERSION_MISMATCH"
+        assert c_res[2].get("code") in ("VERSION_MISMATCH", "CONCURRENT_CONFLICT")
         assert c_res[2].get("server_version") == base_gv + 1
 
     winner_client_idx = successes[0][0]
