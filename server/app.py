@@ -1326,7 +1326,14 @@ WEB_DASHBOARD_HTML = r"""<!DOCTYPE html>
         const notes = document.getElementById("mNotes").value.trim();
 
         if (!name || !password) {
-            showToast("网站名称和密码不能为空！", "fa-triangle-exclamation");
+            showToast("网站/应用名称和密码不能为空！", "fa-triangle-exclamation");
+            return;
+        }
+
+        // Disallow duplicate website name on frontend
+        const dupeItem = allPasswords.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase() && p.id !== id && !p.is_deleted);
+        if (dupeItem) {
+            showToast(`⚠️ 已存在相同名称「${escapeHtml(name)}」的记录，不允许重复添加！请直接在该记录上修改。`, "fa-triangle-exclamation");
             return;
         }
 
@@ -2291,17 +2298,18 @@ class RequestHandler(BaseHTTPRequestHandler):
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Disallow duplicate name, url, username combination
+            # Disallow duplicate website/app name (Strictly enforced by name)
             cursor.execute("""
                 SELECT id FROM password_entries
                 WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
-                  AND LOWER(TRIM(COALESCE(url, ''))) = LOWER(TRIM(?))
-                  AND LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM(?))
                   AND is_deleted = 0 AND id != ?
-            """, (name, url, username, entry_id))
+            """, (name, entry_id))
             if cursor.fetchone():
                 conn.close()
-                self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许重复添加！"})
+                self._send_json(409, {
+                    "error": f"已存在相同的网站/应用名称（{name}），不允许重复添加！只能基于已有记录进行修改。",
+                    "code": "DUPLICATE_NAME"
+                })
                 return
 
             # Increment global version atomically
@@ -2358,8 +2366,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                     r_iv = record.get('iv', '')
                     r_salt = record.get('salt', '')
 
-                cursor.execute("SELECT updated_at FROM password_entries WHERE id = ?", (r_id,))
+                # 1. Match by ID first
+                cursor.execute("SELECT * FROM password_entries WHERE id = ?", (r_id,))
                 existing = cursor.fetchone()
+
+                # 2. If not found by ID and active, match by name to avoid duplicate record creation
+                if not existing and r_is_deleted == 0 and r_name.strip():
+                    cursor.execute("SELECT * FROM password_entries WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) AND is_deleted = 0", (r_name,))
+                    existing_by_name = cursor.fetchone()
+                    if existing_by_name:
+                        existing = existing_by_name
+                        r_id = existing['id']
 
                 if not existing:
                     # Brand new record on client -> always accept and insert
@@ -2370,10 +2387,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                     """, (r_id, r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_created_at, r_updated_at, r_is_deleted, max(client_version, server_version)))
                     applied_count += 1
                 else:
-                    # Existing record present on both:
-                    # 1. If client global version is higher -> client wins
-                    # 2. If equal -> newer updated_at wins
-                    # 3. If server global version is higher -> server keeps its record
+                    # Existing record present on both
+                    target_id = existing['id']
                     if client_version > server_version:
                         cursor.execute("""
                             UPDATE password_entries SET
@@ -2381,7 +2396,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                                 iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?,
                                 version = ?
                             WHERE id = ?
-                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, client_version, r_id))
+                        """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, client_version, target_id))
                         applied_count += 1
                     elif client_version == server_version:
                         if r_updated_at > existing['updated_at']:
@@ -2390,7 +2405,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                                     name = ?, url = ?, username = ?, encrypted_password = ?,
                                     iv = ?, salt = ?, notes = ?, updated_at = ?, is_deleted = ?
                                 WHERE id = ?
-                            """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, r_id))
+                            """, (r_name, r_url, r_username, r_enc_pwd, r_iv, r_salt, r_notes, r_updated_at, r_is_deleted, target_id))
                             applied_count += 1
 
             if client_version > server_version:
@@ -2480,17 +2495,18 @@ class RequestHandler(BaseHTTPRequestHandler):
             iv = body.get('iv', existing['iv'])
             salt = body.get('salt', existing['salt'])
 
-        # Disallow duplicate name, url, username combination on edit
+        # Disallow duplicate website/app name on edit
         cursor.execute("""
             SELECT id FROM password_entries
             WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
-              AND LOWER(TRIM(COALESCE(url, ''))) = LOWER(TRIM(?))
-              AND LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM(?))
               AND is_deleted = 0 AND id != ?
-        """, (name, url, username, entry_id))
+        """, (name, entry_id))
         if cursor.fetchone():
             conn.close()
-            self._send_json(409, {"error": "已存在相同的网站名称、网址与账号组合，不允许修改为重复项！"})
+            self._send_json(409, {
+                "error": f"已存在相同名称（{name}）的其他密码记录，不允许修改为重复名称！",
+                "code": "DUPLICATE_NAME"
+            })
             return
 
         if 'version' not in body:

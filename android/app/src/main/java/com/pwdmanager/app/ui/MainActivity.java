@@ -210,11 +210,11 @@ public class MainActivity extends AppCompatActivity implements PasswordAdapter.O
                 return;
             }
 
-            // Duplicate validation (Disallow duplicate website name, url and username)
+            // Duplicate validation (Strictly disallow duplicate website/app name)
             String excludeId = isEdit && existingItem != null ? existingItem.getId() : null;
-            if (dbHelper.existsDuplicate(excludeId, name, url, username)) {
-                Toast.makeText(MainActivity.this, "已存在相同的网站名称、网址与账号，不允许重复！", Toast.LENGTH_LONG).show();
-                etName.setError("已存在完全相同的记录");
+            if (dbHelper.existsDuplicate(excludeId, name)) {
+                Toast.makeText(MainActivity.this, "已存在相同的网站/应用名称（" + name + "），不允许重复添加！只能基于已有记录修改。", Toast.LENGTH_LONG).show();
+                etName.setError("已存在同名记录，请直接修改原记录");
                 return;
             }
 

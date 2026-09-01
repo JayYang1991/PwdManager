@@ -118,7 +118,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
         "client_records": [
             {
                 "id": sync_id,
-                "name": "Zhihu",
+                "name": f"Zhihu ({test_id})",
                 "url": "https://www.zhihu.com",
                 "username": "sec_researcher",
                 "password": "ZhihuSecurePass@888",
@@ -149,7 +149,7 @@ def run_tests(base_url="http://127.0.0.1:8000"):
         "records": [
             {
                 "id": import_id,
-                "name": "AWS Root Console",
+                "name": f"AWS Root Console ({test_id})",
                 "url": "https://aws.amazon.com",
                 "username": "aws_root",
                 "password": "AWSVaultSecret#2026",

@@ -179,22 +179,14 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
         return list;
     }
 
-    public synchronized boolean existsDuplicate(String excludeId, String name, String url, String username) {
+    public synchronized boolean existsDuplicate(String excludeId, String name) {
         if (name == null) return false;
         SQLiteDatabase db = getReadableDatabase();
         String n = name.trim();
-        String u = url != null ? url.trim() : "";
-        String un = username != null ? username.trim() : "";
 
-        String selection = "LOWER(TRIM(" + COLUMN_NAME + ")) = LOWER(?) " +
-                "AND LOWER(TRIM(COALESCE(" + COLUMN_URL + ", ''))) = LOWER(?) " +
-                "AND LOWER(TRIM(COALESCE(" + COLUMN_USERNAME + ", ''))) = LOWER(?) " +
-                "AND " + COLUMN_IS_DELETED + " = 0";
-
+        String selection = "LOWER(TRIM(" + COLUMN_NAME + ")) = LOWER(?) AND " + COLUMN_IS_DELETED + " = 0";
         List<String> argsList = new ArrayList<>();
         argsList.add(n);
-        argsList.add(u);
-        argsList.add(un);
 
         if (excludeId != null && !excludeId.trim().isEmpty()) {
             selection += " AND " + COLUMN_ID + " != ?";
@@ -208,6 +200,10 @@ public class PasswordDatabaseHelper extends SQLiteOpenHelper {
             cursor.close();
         }
         return exists;
+    }
+
+    public synchronized boolean existsDuplicate(String excludeId, String name, String url, String username) {
+        return existsDuplicate(excludeId, name);
     }
 
     public synchronized PasswordItem getPasswordById(String id) {
